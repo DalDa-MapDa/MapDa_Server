@@ -1,1 +1,13 @@
 # MapDa_Server
+Team 달다(Dal:da) - 조은애/이지현/이유철 | 지도 교수: 신혜련 교수님
+
+## Convention
+- [CHORE]: 프로덕션 코드가 바뀌지 않고 개발 로직과 상관 없는 가벼운 일들
+- [DEPS]: Dependency와 관련 있는 내용
+- [DOCS]: 도큐먼트/문서화 업데이트
+- [FEAT]: 새로운 기능/특징
+- [FIX]: 버그를 고침
+- [HOTFIX]: 시급한 버그를 고침
+- [REFACTOR]: production 코드를 리팩토링
+- [STYLE]: Code의 스타일, 포맷 등이 바뀐 경우
+- [TEST]: 테스트 코드 추가 및 업데이트
