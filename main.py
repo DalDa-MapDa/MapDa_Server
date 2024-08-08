@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from objectDetection import register, objectList  # 새로 추가된 모듈 import
+from objectDetection import register, objectList
+from placeRegister import place_register  # 새로 추가된 모듈 import
 import uvicorn
 
 app = FastAPI()
@@ -15,8 +16,9 @@ app.add_middleware(
 )
 
 # 라우터 등록
-app.include_router(register.router)  # 위험 물체 등록
-app.include_router(objectList.router)  # 위험 물체 리스트
+app.include_router(register.router)
+app.include_router(objectList.router)
+app.include_router(place_register.router)
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
