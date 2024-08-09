@@ -61,7 +61,15 @@ async def register_moving_data(
                 file_extension = file.filename.split('.')[-1]
                 s3_filename = f"{uuid.uuid4()}.{file_extension}"
                 file.file.seek(0)
-                s3_client.upload_fileobj(file.file, S3_BUCKET, s3_filename)
+                # ContentType을 설정하여 브라우저에서 바로 프리뷰 가능하도록 함
+                s3_client.upload_fileobj(
+                    file.file, 
+                    S3_BUCKET, 
+                    s3_filename,
+                    ExtraArgs={
+                        'ContentType': f'image/{file_extension}'
+                    }
+                )
                 image_url = f"https://{S3_BUCKET}.s3.{os.getenv('AWS_REGION')}.amazonaws.com/{s3_filename}"
                 urls.append(image_url)
             return urls
