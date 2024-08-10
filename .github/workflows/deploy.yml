@@ -34,4 +34,4 @@ jobs:
 
     - name: Deploy Docker Container
       run: |
-        ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.AWS_USER }}@${{ secrets.AWS_HOST }} "cd /home/ec2-user/MapDa_Server && docker build -t mapda_server_image . && docker run -d -p 8000:8000 --env-file .env --name mapda_server_container mapda_server_image"
+        ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.AWS_USER }}@${{ secrets.AWS_HOST }} "cd /home/ec2-user/MapDa_Server && docker build -t mapda_server_image . && docker run -d -p 8000:8000 --env-file /home/ec2-user/.env --name mapda_server_container mapda_server_image"
