@@ -20,10 +20,14 @@ jobs:
         chmod 600 ~/.ssh/id_rsa
         ssh-keyscan -H ${{ secrets.AWS_HOST }} >> ~/.ssh/known_hosts
 
+    - name: Stop and remove old Docker container
+      run: |
+        ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.AWS_USER }}@${{ secrets.AWS_HOST }} "docker stop mapda_server_container || true && docker rm mapda_server_container || true"
+
     - name: Copy files to EC2
       run: |
         scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa -r . ${{ secrets.AWS_USER }}@${{ secrets.AWS_HOST }}:/home/ec2-user/MapDa_Server
 
     - name: Deploy Docker Container
       run: |
-        ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.AWS_USER }}@${{ secrets.AWS_HOST }} "cd /home/ec2-user/MapDa_Server && docker build -t mapda_server_image . && docker run -d -p 8000:8000 --env-file .env --name mapda_server_container_v2 mapda_server_image"
+        ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.AWS_USER }}@${{ secrets.AWS_HOST }} "cd /home/ec2-user/MapDa_Server && docker build -t mapda_server_image . && docker run -d -p 8000:8000 --env-file .env --name mapda_server_container mapda_server_image"
