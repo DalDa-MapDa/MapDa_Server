@@ -1,3 +1,4 @@
+from datetime import datetime
 import os
 import uuid
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
@@ -17,7 +18,7 @@ s3_client = boto3.client(
     aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
     region_name=os.getenv('AWS_REGION')
 )
-S3_BUCKET = os.getenv('S3_BUCKET_NAME')
+S3_BUCKET = os.getenv('S3_PLACE_BUCKET_NAME')
 
 router = APIRouter()
 
@@ -77,8 +78,15 @@ async def register_moving_data(
         in_door_image_urls = upload_files(inDoorImage) if inDoorImage else []
         out_door_image_urls = upload_files(outDoorImage) if outDoorImage else []
 
+        # UUID 생성 로직
+        seq_num = db.query(Place).filter(
+            Place.created_at.like(f"{datetime.utcnow().date()}%")
+        ).count() + 1
+        uuid_code = f"P{datetime.utcnow().strftime('%Y%m%d')}{seq_num:04d}"
+
         # DB에 정보 저장
         db_place = Place(
+            uuid=uuid_code,
             user_id=userID,
             place_name=placeName,
             latitude=latitude,
@@ -95,7 +103,7 @@ async def register_moving_data(
         db.commit()
         db.refresh(db_place)
 
-        return {"id": db_place.id, "place_name": db_place.place_name}
+        return {"id": db_place.id, "uuid": db_place.uuid, "place_name": db_place.place_name}
 
     except Exception as e:
         db.rollback()
