@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from objectDetection import register, objectList
-from placeRegister import place_register, placeList  # 새로 추가된 모듈 import
+from placeRegister import place_register, placeList
+from proxy import proxy_server  # 프록시 라우터 import
 import uvicorn
 
 app = FastAPI()
@@ -9,17 +10,20 @@ app = FastAPI()
 # CORS 정책 허용
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 모든 도메인 허용, 필요에 따라 특정 도메인으로 제한 가능
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # 모든 메소드 허용 (GET, POST, etc)
-    allow_headers=["*"],  # 모든 헤더 허용
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-# 라우터 등록
+# 기존 라우터 등록
 app.include_router(register.router)
 app.include_router(objectList.router)
 app.include_router(place_register.router)
-app.include_router(placeList.router)  # 장소 리스트
+app.include_router(placeList.router)
+
+# 프록시 라우터 등록
+app.include_router(proxy_server.router, prefix="/proxy")  # '/proxy' 접두사 사용
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
