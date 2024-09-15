@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from typing import List, Dict
 import boto3
 from sqlalchemy.orm import Session
-from models import SessionLocal, Place
+from models import SessionLocal, Place, PlaceIndoor, PlaceOutdoor
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -95,13 +95,22 @@ async def register_moving_data(
             rest_room_exist=restRoomExist,
             rest_room_floor=restRoomFloor,
             elevator_accessible=elevatorAccessible,
-            ramp_accessible=rampAccessible,
-            in_door_image_urls=",".join(in_door_image_urls),
-            out_door_image_urls=",".join(out_door_image_urls)
+            ramp_accessible=rampAccessible
         )
         db.add(db_place)
         db.commit()
         db.refresh(db_place)
+
+        # 이미지 URL을 place_indoor 및 place_outdoor 테이블에 저장
+        for url in in_door_image_urls:
+            db_indoor = PlaceIndoor(place_id=db_place.id, image_url=url)
+            db.add(db_indoor)
+        
+        for url in out_door_image_urls:
+            db_outdoor = PlaceOutdoor(place_id=db_place.id, image_url=url)
+            db.add(db_outdoor)
+        
+        db.commit()
 
         return {"id": db_place.id, "uuid": db_place.uuid, "place_name": db_place.place_name}
 

@@ -1,6 +1,6 @@
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, func
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, func, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, relationship
 from dotenv import load_dotenv
 import os
 from datetime import datetime
@@ -43,7 +43,7 @@ class UserObject(Base):
 
 class Place(Base):
     __tablename__ = 'places_data'
-
+    
     id = Column(Integer, primary_key=True, index=True)
     uuid = Column(String(20), unique=True, nullable=False, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -56,8 +56,8 @@ class Place(Base):
     rest_room_floor = Column(Integer, nullable=True)
     elevator_accessible = Column(Integer, nullable=True)
     ramp_accessible = Column(Integer, nullable=True)
-    in_door_image_urls = Column(String(1000), nullable=True)
-    out_door_image_urls = Column(String(1000), nullable=True)
+    indoor_images = relationship("PlaceIndoor", backref="place")
+    outdoor_images = relationship("PlaceOutdoor", backref="place")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -68,6 +68,20 @@ class Place(Base):
                 func.date(Place.created_at) == datetime.utcnow().date()).scalar() + 1
             session.close()
             self.uuid = generate_uuid("P", datetime.utcnow(), seq_num)
+
+class PlaceIndoor(Base):
+    __tablename__ = 'place_indoor'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    place_id = Column(Integer, ForeignKey('places_data.id'), nullable=False)
+    image_url = Column(String(255), nullable=False)
+
+class PlaceOutdoor(Base):
+    __tablename__ = 'place_outdoor'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    place_id = Column(Integer, ForeignKey('places_data.id'), nullable=False)
+    image_url = Column(String(255), nullable=False)
 
 # 테이블 생성
 Base.metadata.create_all(bind=engine)
