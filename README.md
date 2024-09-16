@@ -11,3 +11,9 @@ Team 달다(Dal:da) - 조은애/이지현/이유철 | 지도 교수: 신혜련 �
 - [REFACTOR]: production 코드를 리팩토링
 - [STYLE]: Code의 스타일, 포맷 등이 바뀐 경우
 - [TEST]: 테스트 코드 추가 및 업데이트
+
+
+## Dependency
+배포 시
+' sudo apt-get install tesseract-ocr '
+Linux에서 Tesseract 설치를 진행해야함.
