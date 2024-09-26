@@ -2,7 +2,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from objectDetection import register, objectList
 from placeRegister import place_register, placeList
-from ocr_conversion import ocr_conversion
 from proxy import proxy_server  # 프록시 라우터 import
 import uvicorn
 
@@ -22,7 +21,6 @@ app.include_router(register.router)
 app.include_router(objectList.router)
 app.include_router(place_register.router)
 app.include_router(placeList.router)
-app.include_router(ocr_conversion.router)
 app.include_router(proxy_server.router)
 
 if __name__ == "__main__":
