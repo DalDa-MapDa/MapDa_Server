@@ -33,7 +33,7 @@ class MovingData(BaseModel):
     inDoorImage: List[UploadFile] = None
     outDoorImage: List[UploadFile] = None
 
-@router.post("/register_moving_data")
+@router.post("/register_moving_data", tags=["Place"])
 async def register_moving_data(
     userID: int = Form(...),
     placeName: str = Form(...),

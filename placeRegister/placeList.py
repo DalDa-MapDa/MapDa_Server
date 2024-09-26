@@ -5,7 +5,7 @@ from models import SessionLocal, Place
 
 router = APIRouter()
 
-@router.get("/get_place_list")
+@router.get("/get_place_list", tags=["Place"])
 async def get_place_list():
     try:
         # DB 세션 생성

@@ -25,7 +25,7 @@ app.include_router(placeList.router)
 app.include_router(ocr_conversion.router)
 
 # 프록시 라우터 등록
-app.include_router(proxy_server.router, prefix="/proxy")  # '/proxy' 접두사 사용
+app.include_router(proxy_server.router)
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

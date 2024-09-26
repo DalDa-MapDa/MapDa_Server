@@ -73,7 +73,7 @@ def parse_timetable(text: str) -> List[dict]:
     return timetable
 
 # 텍스트 추출 및 JSON 반환 라우터
-@router.post("/timetable_upload")
+@router.post("/timetable_upload", tags=["OCR"])
 async def timetable_upload(file: UploadFile = File(...)):
     content = await file.read()
 

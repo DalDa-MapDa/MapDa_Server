@@ -3,7 +3,7 @@ import httpx
 
 router = APIRouter()
 
-@router.api_route("/", methods=["GET", "POST", "PUT", "DELETE"])
+@router.api_route("/proxy", methods=["GET", "POST", "PUT", "DELETE"], tags=["Proxy"])
 async def proxy(request: Request):
     target_url = request.query_params.get("target_url")
     if not target_url:

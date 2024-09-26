@@ -29,7 +29,7 @@ class ObjectData(BaseModel):
     placeName: str = Form(...)
     imageData: UploadFile = File(...)
 
-@router.post("/register")
+@router.post("/register", tags=["Object"])
 async def register_object(userID: int = Form(...), latitude: float = Form(...),
                           longitude: float = Form(...), objectName: str = Form(...),
                           placeName: str = Form(...), imageData: UploadFile = File(...)):
