@@ -23,8 +23,6 @@ app.include_router(objectList.router)
 app.include_router(place_register.router)
 app.include_router(placeList.router)
 app.include_router(ocr_conversion.router)
-
-# 프록시 라우터 등록
 app.include_router(proxy_server.router)
 
 if __name__ == "__main__":
