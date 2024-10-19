@@ -16,13 +16,14 @@ APPLE_KEY_ID = os.getenv("APPLE_KEY_ID")  # 애플 키 ID
 APPLE_TEAM_ID = os.getenv("APPLE_TEAM_ID")  # 애플 팀 ID
 
 # AuthKey 파일에서 비밀키를 읽어오기 (경로 수정)
-# auth_key_path = "secrets/AuthKey_76ZFAC89DR.p8"
-auth_key_path = "/home/ec2-user/secrets/AuthKey_76ZFAC89DR.p8"  # 서버상의 실제 경로로 수정
+# auth_key_path = "secrets/AuthKey_76ZFAC89DR.p8" # 로컬 경로
+auth_key_path = "/app/secrets/AuthKey_76ZFAC89DR.p8" # 서버 경로
 try:
     with open(auth_key_path, "r") as key_file:
         APPLE_PRIVATE_KEY = key_file.read()
 except FileNotFoundError:
     raise HTTPException(status_code=500, detail=f"비밀키 파일을 찾을 수 없습니다: {auth_key_path}")
+
 
 @router.post('/login/apple')
 async def apple_login(identityToken: str, authorizationCode: str):
