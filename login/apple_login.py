@@ -4,17 +4,20 @@ import jwt  # PyJWT 라이브러리
 import datetime
 from fastapi import APIRouter, HTTPException
 from dotenv import load_dotenv
-from typing import Optional
 
 router = APIRouter()
 
 # .env 파일 로드
 load_dotenv()
 
+# 애플 관련 환경 변수 로드
 APPLE_CLIENT_ID = os.getenv("APPLE_CLIENT_ID")  # 애플 클라이언트 ID
 APPLE_KEY_ID = os.getenv("APPLE_KEY_ID")  # 애플 키 ID
 APPLE_TEAM_ID = os.getenv("APPLE_TEAM_ID")  # 애플 팀 ID
-APPLE_PRIVATE_KEY = os.getenv("APPLE_PRIVATE_KEY")  # 애플의 비밀키
+
+# AuthKey 파일에서 비밀키를 읽어오기
+with open("secrets/AuthKey_76ZFAC89DR.p8", "r") as key_file:
+    APPLE_PRIVATE_KEY = key_file.read()
 
 @router.post('/login/apple')
 async def apple_login(identityToken: str, authorizationCode: str):

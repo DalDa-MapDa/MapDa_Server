@@ -19,7 +19,7 @@ KAKAO_USER_INFO_URL = "https://kapi.kakao.com/v2/user/me"
 KAKAO_UNREGISTER_URL = "https://kapi.kakao.com/v1/user/unlink"  # Unlink URL 추가
 
 # 카카오 로그인 리다이렉트 엔드포인트
-@router.get('/login/kakao')
+@router.get('/login/kakao', tags=["Login"])
 def kakao_login():
     url = f"https://kauth.kakao.com/oauth/authorize?client_id={KAKAO_REST_API_KEY}&response_type=code&redirect_uri={KAKAO_REDIRECT_URI}"
     return RedirectResponse(url)
@@ -38,7 +38,7 @@ def kakao_user_info(access_token: str):
     return user_info_response.json()
 
 # 카카오 인증 후 액세스 토큰을 발급받고, 사용자 정보를 가져오는 엔드포인트
-@router.get('/login/kakao/auth')
+@router.get('/login/kakao/auth', tags=["Login"])
 async def kakao_auth(code: Optional[str] = None):
     if code is None:
         raise HTTPException(status_code=400, detail="카카오 인증 코드가 제공되지 않았습니다.")
@@ -73,7 +73,7 @@ async def kakao_auth(code: Optional[str] = None):
     }
 
 # 카카오 연결 해제 (unlink) 메소드
-@router.post('/login/kakao/unregister')
+@router.post('/login/kakao/unregister', tags=["Login"])
 async def kakao_unregister(target_id: str):
     if not KAKAO_ADMIN_KEY:
         raise HTTPException(status_code=500, detail="KAKAO_ADMIN_KEY가 설정되지 않았습니다.")
