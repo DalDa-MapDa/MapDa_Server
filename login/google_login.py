@@ -1,8 +1,9 @@
 import os
 from fastapi import APIRouter, HTTPException, Request
-import requests
 from pydantic import BaseModel
 from dotenv import load_dotenv
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
 
 router = APIRouter()
 
@@ -11,48 +12,32 @@ load_dotenv()
 
 # 구글 관련 환경 변수 로드
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
-GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
-GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI")
 
 class GoogleLoginData(BaseModel):
-    code: str
+    idToken: str
 
 @router.post("/login/google")
 async def google_login(data: GoogleLoginData, request: Request):
     print(f"Received Google login request from {request.client.host}")
     print(f"Request data: {data}")
 
-    # 1. Google OAuth 2.0 서버로부터 Access Token 요청
-    token_url = "https://oauth2.googleapis.com/token"
-    token_data = {
-        'code': data.code,
-        'client_id': GOOGLE_CLIENT_ID,
-        'client_secret': GOOGLE_CLIENT_SECRET,
-        'redirect_uri': GOOGLE_REDIRECT_URI,
-        'grant_type': 'authorization_code'
-    }
+    try:
+        # 1. Google ID Token 검증
+        id_info = id_token.verify_oauth2_token(data.idToken, google_requests.Request(), GOOGLE_CLIENT_ID)
 
-    print(f"Sending token request to Google: {token_data}")
-    
-    token_response = requests.post(token_url, data=token_data)
-    
-    if token_response.status_code != 200:
-        print(f"Google token request failed with status code: {token_response.status_code}, response: {token_response.text}")
-        raise HTTPException(status_code=token_response.status_code, detail="구글 인증 실패")
+        if id_info['aud'] != GOOGLE_CLIENT_ID:
+            raise HTTPException(status_code=400, detail="잘못된 클라이언트 ID입니다.")
 
-    token_info = token_response.json()
-    print(f"Google token response: {token_info}")
-    
-    # 2. Access Token을 사용하여 사용자 정보 요청
-    user_info_url = "https://www.googleapis.com/oauth2/v2/userinfo"
-    user_info_response = requests.get(user_info_url, headers={"Authorization": f"Bearer {token_info['access_token']}"})
-    
-    if user_info_response.status_code != 200:
-        print(f"Google user info request failed with status code: {user_info_response.status_code}, response: {user_info_response.text}")
-        raise HTTPException(status_code=user_info_response.status_code, detail="사용자 정보 요청 실패")
+        # 2. 사용자 정보 반환
+        user_info = {
+            'email': id_info.get('email'),
+            'name': id_info.get('name'),
+            'picture': id_info.get('picture')
+        }
 
-    user_info = user_info_response.json()
-    print(f"Google user info response: {user_info}")
-    
-    # 3. 사용자 정보 반환
-    return {"message": "구글 로그인 성공", "user_info": user_info}
+        print(f"Google user info response: {user_info}")
+        return {"message": "구글 로그인 성공", "user_info": user_info}
+
+    except ValueError as e:
+        print(f"Google token verification failed: {e}")
+        raise HTTPException(status_code=400, detail="ID 토큰 검증 실패")
