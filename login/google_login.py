@@ -1,6 +1,5 @@
 import os
 from fastapi import APIRouter, HTTPException, Request
-import requests
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from google.oauth2 import id_token
@@ -19,9 +18,7 @@ class GoogleLoginData(BaseModel):
 
 @router.post("/login/google")
 async def google_login(data: GoogleLoginData, request: Request):
-    print(f"Received Google login request from {request.client.host}")
-    print(f"Request data: {data}")
-
+    # 최적화된 Google 로그인 처리
     try:
         # ID 토큰 검증
         id_info = id_token.verify_oauth2_token(
@@ -30,12 +27,10 @@ async def google_login(data: GoogleLoginData, request: Request):
 
         # 클라이언트 ID 확인
         if id_info['aud'] not in GOOGLE_CLIENT_IDS:
-            raise ValueError(f"Token has wrong audience {id_info['aud']}")
+            raise ValueError("Invalid client ID")
 
-        # 사용자 정보 출력
-        print(f"Google user info: {id_info}")
+        # 사용자 정보 반환
         return {"message": "구글 로그인 성공", "user_info": id_info}
-    except ValueError as e:
-        print(f"Google token verification failed: {str(e)}")
-        raise HTTPException(status_code=400, detail="구글 인증 실패")
 
+    except ValueError:
+        raise HTTPException(status_code=400, detail="구글 인증 실패")
