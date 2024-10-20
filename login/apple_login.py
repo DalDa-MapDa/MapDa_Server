@@ -61,7 +61,7 @@ async def apple_login(data: AppleLoginData):
     # 3. id_token과 refresh_token 반환
     return {
         "message": "애플 로그인 성공",
-        "id_token": token_data.get('id_token'),
+        "decoded_id_token": decoded_token,  # 디코딩된 id_token 반환
         "refresh_token": token_data.get('refresh_token')
     }
 
