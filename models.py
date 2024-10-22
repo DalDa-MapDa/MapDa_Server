@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, func, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Date, Enum, ForeignKey, func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from dotenv import load_dotenv
@@ -15,38 +15,95 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 def generate_uuid(prefix: str, date: datetime, seq_num: int) -> str:
-    date_str = date.strftime('%Y%m%d')  # YYYYMMDD 형식
-    return f"{prefix}{date_str}{seq_num:03d}"  # 순번을 3자리로 설정
+    date_str = date.strftime('%Y%m%d')  # YYYYMMDD format
+    return f"{prefix}{date_str}{seq_num:011d}"  # Adjusted to make total length 21 characters
+
+class User(Base):
+    __tablename__ = 'user'
+
+    id = Column(Integer, primary_key=True, index=True)
+    uuid = Column(String(21), unique=True, nullable=False, index=True)
+    role = Column(Enum('admin', 'user', 'manager', name='user_roles'), default='user', nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    status = Column(Enum('Active', 'Block', 'Deleted', name='user_statuses'), default='Active', nullable=False)
+    email = Column(String(255), unique=True, nullable=True)
+    nickname = Column(String(255), nullable=True)
+    birth = Column(Date, nullable=True)
+    university = Column(Enum('MYONGJI_SEOUL', name='university_names'), nullable=True)
+    residence = Column(String(255), nullable=True)
+    profile_number = Column(Integer, default=1, nullable=False)
+    provider_type = Column(Enum('KAKAO', 'APPLE', 'GOOGLE', name='provider_types'), nullable=True)
+    provider_id = Column(String(255), nullable=False)
+    provider_profile_image = Column(String(255), nullable=True)
+    provider_user_name = Column(String(255), nullable=True)
+
+    # Relationships
+    tokens = relationship('Token', back_populates='user')
+    user_objects = relationship('UserObject', back_populates='user')
+    places = relationship('Place', back_populates='user')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self.uuid:
+            # Generate UUID
+            session = SessionLocal()
+            seq_num = session.query(func.count(User.id)).filter(
+                func.date(User.created_at) == datetime.utcnow().date()
+            ).scalar() + 1
+            session.close()
+            self.uuid = generate_uuid("U", datetime.utcnow(), seq_num)
+
+class Token(Base):
+    __tablename__ = 'tokens'
+
+    id = Column(Integer, primary_key=True, index=True)
+    uuid = Column(String(21), ForeignKey('users.uuid'), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    status = Column(Enum('Active', 'Block', 'Deleted', name='token_statuses'), default='Active', nullable=False)
+    refresh_token = Column(String(255), nullable=False)
+    provider_type = Column(Enum('KAKAO', 'APPLE', 'GOOGLE', name='provider_types'), nullable=True)
+    provider_access_token = Column(String(255), nullable=True)
+    provider_refresh_token = Column(String(255), nullable=True)
+
+    # Relationship
+    user = relationship('User', back_populates='tokens')
 
 class UserObject(Base):
     __tablename__ = 'user_objects'
 
     id = Column(Integer, primary_key=True, index=True)
-    uuid = Column(String(20), unique=True, nullable=False, index=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    resource_id = Column(String(21), unique=True, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     user_id = Column(Integer, nullable=False)
     latitude = Column(Float, nullable=False)
     longitude = Column(Float, nullable=False)
     object_name = Column(String(255), nullable=False)
     place_name = Column(String(255), nullable=False)
     image_url = Column(String(255), nullable=False)
+    created_uuid = Column(String(21), ForeignKey('users.uuid'), nullable=False)
+
+    # Relationship
+    user = relationship('User', back_populates='user_objects')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if not self.uuid:
-            # 해당 일자의 기존 레코드 수를 세어 순번을 만듭니다.
+        if not self.resource_id:
+            # Generate resource_id starting with 'UO'
             session = SessionLocal()
             seq_num = session.query(func.count(UserObject.id)).filter(
-                func.date(UserObject.created_at) == datetime.utcnow().date()).scalar() + 1
+                func.date(UserObject.created_at) == datetime.utcnow().date()
+            ).scalar() + 1
             session.close()
-            self.uuid = generate_uuid("U", datetime.utcnow(), seq_num)
+            self.resource_id = generate_uuid("UO", datetime.utcnow(), seq_num)
 
 class Place(Base):
     __tablename__ = 'places_data'
-    
+
     id = Column(Integer, primary_key=True, index=True)
-    uuid = Column(String(20), unique=True, nullable=False, index=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    resource_id = Column(String(21), unique=True, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     user_id = Column(Integer, nullable=False)
     place_name = Column(String(255), nullable=False)
     latitude = Column(Float, nullable=False)
@@ -56,32 +113,37 @@ class Place(Base):
     rest_room_floor = Column(Integer, nullable=True)
     elevator_accessible = Column(Integer, nullable=True)
     ramp_accessible = Column(Integer, nullable=True)
+    created_uuid = Column(String(21), ForeignKey('users.uuid'), nullable=False)
+
+    # Relationships
     indoor_images = relationship("PlaceIndoor", backref="place")
     outdoor_images = relationship("PlaceOutdoor", backref="place")
+    user = relationship('User', back_populates='places')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if not self.uuid:
-            # 해당 일자의 기존 레코드 수를 세어 순번을 만듭니다.
+        if not self.resource_id:
+            # Generate resource_id starting with 'PD'
             session = SessionLocal()
             seq_num = session.query(func.count(Place.id)).filter(
-                func.date(Place.created_at) == datetime.utcnow().date()).scalar() + 1
+                func.date(Place.created_at) == datetime.utcnow().date()
+            ).scalar() + 1
             session.close()
-            self.uuid = generate_uuid("P", datetime.utcnow(), seq_num)
+            self.resource_id = generate_uuid("PD", datetime.utcnow(), seq_num)
 
 class PlaceIndoor(Base):
     __tablename__ = 'place_indoor'
-    
+
     id = Column(Integer, primary_key=True, index=True)
     place_id = Column(Integer, ForeignKey('places_data.id'), nullable=False)
     image_url = Column(String(255), nullable=False)
 
 class PlaceOutdoor(Base):
     __tablename__ = 'place_outdoor'
-    
+
     id = Column(Integer, primary_key=True, index=True)
     place_id = Column(Integer, ForeignKey('places_data.id'), nullable=False)
     image_url = Column(String(255), nullable=False)
 
-# 테이블 생성
+# Create all tables
 Base.metadata.create_all(bind=engine)
