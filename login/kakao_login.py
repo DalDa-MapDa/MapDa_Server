@@ -16,17 +16,33 @@ KAKAO_ADMIN_KEY = os.getenv("KAKAO_ADMIN_KEY")  # Admin Key 추가
 # 사용자 정보 모델 정의
 class KakaoUserInfo(BaseModel):
     id: str
-    nickname: Optional[str]
-    email: Optional[str]
+    nickname: Optional[str] = None  # Null 값 허용
+    email: Optional[str] = None
+    profileImage: Optional[str] = None
+    thumbnailImage: Optional[str] = None
+    connectedAt: Optional[str] = None
 
 # 카카오 로그인 정보 받기 엔드포인트
 @router.post('/login/kakao', tags=["Login"])
 async def kakao_login(user_info: KakaoUserInfo):
     try:
-        # 여기서 전달받은 사용자 정보를 처리합니다.
-        print(f"Received Kakao user info: {user_info}")
-        # 예시: 데이터베이스에 저장하거나 세션을 생성하는 등의 처리
-        return {"message": "Kakao user info received successfully"}
+        # id는 필수로 받음, 나머지는 Optional
+        user_data = {
+            "id": user_info.id,
+            "nickname": user_info.nickname if user_info.nickname else "No Nickname",
+            "email": user_info.email if user_info.email else "No Email",
+            "profileImage": user_info.profileImage if user_info.profileImage else "No Profile Image",
+            "thumbnailImage": user_info.thumbnailImage if user_info.thumbnailImage else "No Thumbnail Image",
+            "connectedAt": user_info.connectedAt if user_info.connectedAt else "Not Connected Yet",
+        }
+
+        # 사용자 정보 출력 (필요시 다른 처리 가능)
+        print(f"Processed Kakao user info: {user_data}")
+
+        return {
+            "message": "Kakao user info received successfully",
+            "user_info": user_data
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing user info: {str(e)}")
 
