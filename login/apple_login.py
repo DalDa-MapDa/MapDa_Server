@@ -30,7 +30,7 @@ class AppleLoginData(BaseModel):
     identityToken: str
     authorizationCode: str
 
-@router.post('/login/apple')
+@router.post('/login/apple', tags=["Login"])
 async def apple_login(data: AppleLoginData):
     # 1. 애플로부터 받은 identityToken 검증
     try:
@@ -96,7 +96,7 @@ def verify_and_decode_identity_token(identity_token: str) -> dict:
         return None
 
 # 회원 탈퇴 로직
-@router.delete('/login/apple/unregister')
+@router.delete('/login/apple/unregister', tags=["Login"])
 async def apple_unregister(user_refresh_token: str):
     # 저장된 refresh_token을 이용해 애플 회원 탈퇴 요청
     try:
