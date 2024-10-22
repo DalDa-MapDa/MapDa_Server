@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from objectDetection import register, objectList
 from placeRegister import place_register, placeList
@@ -16,6 +16,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# UTF-8 인코딩을 적용하는 미들웨어
+@app.middleware("http")
+async def add_utf8_encoding(request: Request, call_next):
+    response = await call_next(request)
+    # 모든 응답에 Content-Type을 설정하여 UTF-8 인코딩을 적용
+    if "text" in response.headers.get("content-type", ""):
+        response.headers["Content-Type"] = "text/html; charset=utf-8"
+    elif "application/json" in response.headers.get("content-type", ""):
+        response.headers["Content-Type"] = "application/json; charset=utf-8"
+    return response
 
 # 라우터 등록
 app.include_router(register.router)
