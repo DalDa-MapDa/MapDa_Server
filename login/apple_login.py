@@ -17,8 +17,8 @@ APPLE_KEY_ID = os.getenv("APPLE_KEY_ID")  # 애플 키 ID
 APPLE_TEAM_ID = os.getenv("APPLE_TEAM_ID")  # 애플 팀 ID
 
 # AuthKey 파일에서 비밀키를 읽어오기
-auth_key_path = "/app/secrets/AuthKey_76ZFAC89DR.p8"  # 서버 경로
-# auth_key_path = "app/secrets/AuthKey_76ZFAC89DR.p8"  # 로컬 경로
+# auth_key_path = "/app/secrets/AuthKey_76ZFAC89DR.p8"  # 서버 경로
+auth_key_path = "app/secrets/AuthKey_76ZFAC89DR.p8"  # 로컬 경로
 try:
     with open(auth_key_path, "r") as key_file:
         APPLE_PRIVATE_KEY = key_file.read()
@@ -96,7 +96,7 @@ def verify_and_decode_identity_token(identity_token: str) -> dict:
         return None
 
 # 회원 탈퇴 로직
-@router.post('/login/apple/unregister')
+@router.delete('/login/apple/unregister')
 async def apple_unregister(user_refresh_token: str):
     # 저장된 refresh_token을 이용해 애플 회원 탈퇴 요청
     try:

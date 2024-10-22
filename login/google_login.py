@@ -48,7 +48,7 @@ async def google_login(data: GoogleLoginData, request: Request):
         raise HTTPException(status_code=400, detail="구글 인증 실패")
 
 # 구글 계정 연결 해제 (revoke) 메소드
-@router.post("/login/google/unregister")
+@router.delete("/login/google/unregister")
 async def google_unregister(user_access_token: str):
     try:
         # 구글 revoke URL
