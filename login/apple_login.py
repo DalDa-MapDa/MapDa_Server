@@ -97,7 +97,7 @@ def verify_and_decode_identity_token(identity_token: str) -> dict:
 
 # 회원 탈퇴 로직
 @router.post('/login/apple/unregister')
-async def apple_logout(refresh_token: str):
+async def apple_unregister(user_refresh_token: str):
     # 저장된 refresh_token을 이용해 애플 회원 탈퇴 요청
     try:
         response = requests.post(
@@ -105,7 +105,7 @@ async def apple_logout(refresh_token: str):
             data={
                 'client_id': APPLE_CLIENT_ID,
                 'client_secret': create_client_secret(),
-                'token': refresh_token,  # 저장된 refresh_token 사용
+                'token': user_refresh_token,  # 저장된 refresh_token 사용
                 'token_type_hint': 'refresh_token'
             },
             headers={
