@@ -26,7 +26,7 @@ class User(Base):
     role = Column(Enum('admin', 'user', 'manager', name='user_roles'), default='user', nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-    status = Column(Enum('Active', 'Block', 'Deleted', name='user_statuses'), default='Active', nullable=False)
+    status = Column(Enum('Active', 'Block', 'Deleted', 'Need_Register', name='user_statuses'), default='Active', nullable=False)
     email = Column(String(255), unique=True, nullable=True)
     nickname = Column(String(255), nullable=True)
     birth = Column(Date, nullable=True)
@@ -37,7 +37,7 @@ class User(Base):
     provider_id = Column(String(255), nullable=False)
     provider_profile_image = Column(String(255), nullable=True)
     provider_user_name = Column(String(255), nullable=True)
-    apple_provider_nonce_supported = Column(Integer, nullable=True)
+    apple_real_user_status = Column(Integer, nullable=True)
 
     # Relationships
     tokens = relationship('Token', back_populates='user')
