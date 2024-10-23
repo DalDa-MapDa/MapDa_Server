@@ -19,6 +19,7 @@ class KakaoUserInfo(BaseModel):
     nickname: Optional[str] = None  # Null 값 허용
     email: Optional[str] = None
     profileImage: Optional[str] = None
+    isProfileImageDefault: Optional[bool] = None  # 추가된 필드
     thumbnailImage: Optional[str] = None
     connectedAt: Optional[str] = None
 
@@ -26,12 +27,13 @@ class KakaoUserInfo(BaseModel):
 @router.post('/login/kakao', tags=["Login"])
 async def kakao_login(user_info: KakaoUserInfo):
     try:
-        # id는 필수로 받음, 나머지는 Optional
+        # 사용자 정보를 받아서 저장하거나 처리
         user_data = {
             "id": user_info.id,
             "nickname": user_info.nickname if user_info.nickname else "No Nickname",
             "email": user_info.email if user_info.email else "No Email",
             "profileImage": user_info.profileImage if user_info.profileImage else "No Profile Image",
+            "isProfileImageDefault": user_info.isProfileImageDefault if user_info.isProfileImageDefault is not None else "Unknown",
             "thumbnailImage": user_info.thumbnailImage if user_info.thumbnailImage else "No Thumbnail Image",
             "connectedAt": user_info.connectedAt if user_info.connectedAt else "Not Connected Yet",
         }
@@ -39,12 +41,33 @@ async def kakao_login(user_info: KakaoUserInfo):
         # 사용자 정보 출력 (필요시 다른 처리 가능)
         print(f"Processed Kakao user info: {user_data}")
 
-        return {
-            "message": "Kakao user info received successfully",
-            "user_info": user_data
-        }
+        # 카카오 API를 이용한 사용자 검증
+        verification_response = verify_kakao_user(user_info.id)
+        if verification_response.status_code == 200:
+            return {"message": "Kakao user info received and verified successfully", "user_info": user_data}
+        else:
+            raise HTTPException(status_code=400, detail="Kakao user verification failed")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing user info: {str(e)}")
+
+# 카카오 사용자 검증 메소드
+def verify_kakao_user(user_id: str):
+    if not KAKAO_ADMIN_KEY:
+        raise HTTPException(status_code=500, detail="KAKAO_ADMIN_KEY가 설정되지 않았습니다.")
+
+    headers = {
+        "Authorization": f"KakaoAK {KAKAO_ADMIN_KEY}",
+        "Content-Type": "application/x-www-form-urlencoded"
+    }
+    
+    # 검증 요청 데이터
+    verify_data = {
+        "target_id_type": "user_id",
+        "target_id": user_id
+    }
+
+    # POST 요청으로 검증
+    return requests.post('https://kapi.kakao.com/v2/user/me', headers=headers, data=verify_data)
 
 # 카카오 연결 해제 (unlink) 메소드
 @router.delete('/login/kakao/unregister', tags=["Login"])
@@ -52,13 +75,11 @@ async def kakao_unregister(user_id: str):
     if not KAKAO_ADMIN_KEY:
         raise HTTPException(status_code=500, detail="KAKAO_ADMIN_KEY가 설정되지 않았습니다.")
 
-    # Admin Key 기반으로 카카오 사용자 연결 해제 API 호출
     headers = {
         "Authorization": f"KakaoAK {KAKAO_ADMIN_KEY}",
         "Content-Type": "application/x-www-form-urlencoded"
     }
     
-    # 연결 해제 요청 데이터
     unregister_data = {
         "target_id_type": "user_id",
         "target_id": user_id
