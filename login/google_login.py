@@ -7,7 +7,7 @@ from google.auth.transport import requests as google_requests
 import requests
 from sqlalchemy.orm import Session
 from models import SessionLocal
-from login.login_token_manage import (
+from ..token.login_token_manage import (
     get_user_by_provider, create_user, update_user, create_or_update_token,
     create_access_token, create_refresh_token
 )
