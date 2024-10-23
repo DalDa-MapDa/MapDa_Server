@@ -2,7 +2,6 @@ import jwt
 import datetime
 from sqlalchemy.orm import Session
 from models import User, Token
-from sqlalchemy.exc import SQLAlchemyError
 from dotenv import load_dotenv
 import os
 

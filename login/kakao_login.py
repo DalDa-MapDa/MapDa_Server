@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from typing import Optional
 from sqlalchemy.orm import Session
 from models import SessionLocal
-from ..token.login_token_manage import (
+from login.login_token_manage import (
     get_user_by_provider, create_user, update_user, create_or_update_token,
     create_access_token, create_refresh_token
 )

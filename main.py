@@ -6,8 +6,6 @@ from proxy import proxy_server  # 프록시 라우터 import
 from login import kakao_login, apple_login, google_login
 import uvicorn
 
-from token import login_token_manage
-
 app = FastAPI()
 
 # CORS 정책 허용
