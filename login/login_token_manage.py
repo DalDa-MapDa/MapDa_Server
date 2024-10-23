@@ -17,7 +17,12 @@ ACCESS_TOKEN_EXPIRE_SECONDS = 3600  # 1시간
 REFRESH_TOKEN_EXPIRE_SECONDS = 604800  # 7일
 
 def get_user_by_provider(db: Session, provider_type: str, provider_id: str):
-    return db.query(User).filter(User.provider_type == provider_type, User.provider_id == provider_id).first()
+    return db.query(User).filter(
+        User.provider_type == provider_type,
+        User.provider_id == provider_id,
+        User.status != 'Deleted'  # Deleted 상태의 사용자는 제외
+    ).first()
+
 
 def create_user(db: Session, **kwargs):
     user = User(**kwargs)
