@@ -75,7 +75,8 @@ async def kakao_login(user_info: KakaoUserInfo):
             create_or_update_token(
                 db,
                 user_uuid=user.uuid,
-                refresh_token=refresh_token
+                refresh_token=refresh_token,
+                provider_type='KAKAO'
             )
 
             db.close()
@@ -102,7 +103,8 @@ async def kakao_login(user_info: KakaoUserInfo):
             create_or_update_token(
                 db,
                 user_uuid=user.uuid,
-                refresh_token=refresh_token
+                refresh_token=refresh_token,
+                provider_type='KAKAO'                
             )
 
             db.close()
