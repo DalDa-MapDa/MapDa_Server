@@ -7,7 +7,7 @@ from google.auth.transport import requests as google_requests
 import requests
 from sqlalchemy.orm import Session
 from models import SessionLocal
-from login.login_token_manage import (
+from ..token.login_token_manage import (
     get_user_by_provider, create_user, update_user, create_or_update_token,
     create_access_token, create_refresh_token
 )
@@ -62,8 +62,8 @@ async def google_login(data: GoogleLoginData):
             )
 
             # 서버에서 JWT 토큰 생성
-            access_token = create_access_token(data={"uuid": user.uuid})
-            refresh_token = create_refresh_token(data={"uuid": user.uuid})
+            access_token = create_access_token()
+            refresh_token = create_refresh_token()
 
             # 토큰 저장
             create_or_update_token(
@@ -91,8 +91,8 @@ async def google_login(data: GoogleLoginData):
             user = update_user(db, user, **updated_fields)
 
             # 서버에서 JWT 토큰 생성
-            access_token = create_access_token(data={"uuid": user.uuid})
-            refresh_token = create_refresh_token(data={"uuid": user.uuid})
+            access_token = create_access_token()
+            refresh_token = create_refresh_token()
 
             # 토큰 업데이트
             create_or_update_token(

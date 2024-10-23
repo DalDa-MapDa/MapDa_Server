@@ -3,8 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from objectDetection import register, objectList
 from placeRegister import place_register, placeList
 from proxy import proxy_server  # 프록시 라우터 import
-from login import kakao_login, apple_login, google_login, login_token_manage
+from login import kakao_login, apple_login, google_login
 import uvicorn
+
+from token import login_token_manage
 
 app = FastAPI()
 

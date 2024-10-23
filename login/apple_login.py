@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 import os
 from sqlalchemy.orm import Session
 from models import SessionLocal
-from login.login_token_manage import (
+from ..token.login_token_manage import (
     get_user_by_provider, create_user, create_or_update_token,
     create_access_token, create_refresh_token
 )
@@ -95,8 +95,8 @@ async def apple_login(data: AppleLoginData):
         )
 
         # 서버에서 JWT 토큰 생성
-        access_token = create_access_token(data={"uuid": user.uuid})
-        refresh_token = create_refresh_token(data={"uuid": user.uuid})
+        access_token = create_access_token()
+        refresh_token = create_refresh_token()
 
         # 토큰 저장
         create_or_update_token(
@@ -118,8 +118,8 @@ async def apple_login(data: AppleLoginData):
         # 이미 회원가입은 했으나 추가 정보가 필요한 상태
 
         # 서버에서 JWT 토큰 생성
-        access_token = create_access_token(data={"uuid": user.uuid})
-        refresh_token = create_refresh_token(data={"uuid": user.uuid})
+        access_token = create_access_token()
+        refresh_token = create_refresh_token()
 
         # 토큰 업데이트
         create_or_update_token(
@@ -141,8 +141,8 @@ async def apple_login(data: AppleLoginData):
         # 기존 유저이며 Active 상태
 
         # 서버에서 JWT 토큰 생성
-        access_token = create_access_token(data={"uuid": user.uuid})
-        refresh_token = create_refresh_token(data={"uuid": user.uuid})
+        access_token = create_access_token()
+        refresh_token = create_refresh_token()
 
         # 토큰 업데이트
         create_or_update_token(
