@@ -68,8 +68,8 @@ async def kakao_login(user_info: KakaoUserInfo):
             )
 
             # 서버에서 JWT 토큰 생성
-            access_token = create_access_token(data={"uuid": user.uuid})
-            refresh_token = create_refresh_token(data={"uuid": user.uuid})
+            access_token = create_access_token()
+            refresh_token = create_refresh_token()
 
             # 토큰 저장
             create_or_update_token(
@@ -95,8 +95,8 @@ async def kakao_login(user_info: KakaoUserInfo):
             user = update_user(db, user, **updated_fields)
 
             # 서버에서 JWT 토큰 생성
-            access_token = create_access_token(data={"uuid": user.uuid})
-            refresh_token = create_refresh_token(data={"uuid": user.uuid})
+            access_token = create_access_token()
+            refresh_token = create_refresh_token()
 
             # 토큰 업데이트
             create_or_update_token(
