@@ -19,7 +19,7 @@ def generate_uuid(prefix: str, date: datetime, seq_num: int) -> str:
     return f"{prefix}{date_str}{seq_num:011d}"  # Adjusted to make total length 21 characters
 
 class User(Base):
-    __tablename__ = 'user'
+    __tablename__ = 'users'
 
     id = Column(Integer, primary_key=True, index=True)
     uuid = Column(String(21), unique=True, nullable=False, index=True)
@@ -37,6 +37,7 @@ class User(Base):
     provider_id = Column(String(255), nullable=False)
     provider_profile_image = Column(String(255), nullable=True)
     provider_user_name = Column(String(255), nullable=True)
+    apple_provider_nonce_supported = Column(Integer, nullable=True)
 
     # Relationships
     tokens = relationship('Token', back_populates='user')
