@@ -23,8 +23,8 @@ APPLE_KEY_ID = os.getenv("APPLE_KEY_ID")
 APPLE_TEAM_ID = os.getenv("APPLE_TEAM_ID")
 
 # AuthKey 파일에서 비밀키를 읽어오기
-auth_key_path = "/app/secrets/AuthKey_76ZFAC89DR.p8"  # 서버 경로
-# auth_key_path = "app/secrets/AuthKey_76ZFAC89DR.p8"  # 로컬 경로
+# auth_key_path = "/app/secrets/AuthKey_76ZFAC89DR.p8"  # 서버 경로
+auth_key_path = "app/secrets/AuthKey_76ZFAC89DR.p8"  # 로컬 경로
 
 try:
     with open(auth_key_path, "r") as key_file:
@@ -190,3 +190,30 @@ def verify_and_decode_identity_token(identity_token: str) -> dict:
         return decoded_token
     except jwt.InvalidTokenError:
         return None
+
+
+# 회원 탈퇴 로직
+@router.delete('/login/apple/unregister', tags=["Login"])
+async def apple_unregister(user_refresh_token: str):
+    # 저장된 refresh_token을 이용해 애플 회원 탈퇴 요청
+    try:
+        response = requests.post(
+            'https://appleid.apple.com/auth/revoke',
+            data={
+                'client_id': APPLE_CLIENT_ID,
+                'client_secret': create_client_secret(),
+                'token': user_refresh_token,  # 저장된 refresh_token 사용
+                'token_type_hint': 'refresh_token'
+            },
+            headers={
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="애플 회원 탈퇴 요청 중 오류 발생")
+
+    # 탈퇴 요청 실패 시 처리
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code, detail="애플 회원 탈퇴 실패")
+
+    return {"message": "애플 회원 탈퇴 성공"}
