@@ -66,68 +66,52 @@ async def kakao_login(user_info: KakaoUserInfo):
                 provider_user_name=user_data['nickname'],
                 status='Need_Register'  # 상태를 Need_Register로 설정
             )
-
-            # 서버에서 JWT 토큰 생성
-            access_token = create_access_token()
-            refresh_token = create_refresh_token()
-
-            # 토큰 저장
-            create_or_update_token(
-                db,
-                user_uuid=user.uuid,
-                refresh_token=refresh_token,
-                provider_type='KAKAO'
-            )
-
-            db.close()
-            return {
-                "message": "Need_Register",
-                "access_token": access_token,
-                "refresh_token": refresh_token
-            }, 201
-
+            message = "Need_Register"
+            status_code = 201
         else:
             # 이메일, 프로필 이미지, 닉네임 업데이트
-            updated_fields = {
-                "email": user_data['email'],
-                "provider_profile_image": provider_profile_image,
-                "provider_user_name": user_data['nickname']
-            }
-            user = update_user(db, user, **updated_fields)
+            updated_fields = {}
+            if user_data['email'] is not None:
+                updated_fields["email"] = user_data['email']
+            if provider_profile_image is not None:
+                updated_fields["provider_profile_image"] = provider_profile_image
+            if user_data['nickname'] is not None:
+                updated_fields["provider_user_name"] = user_data['nickname']
 
-            # 서버에서 JWT 토큰 생성
-            access_token = create_access_token()
-            refresh_token = create_refresh_token()
-
-            # 토큰 업데이트
-            create_or_update_token(
-                db,
-                user_uuid=user.uuid,
-                refresh_token=refresh_token,
-                provider_type='KAKAO'                
-            )
-
-            db.close()
+            if updated_fields:
+                user = update_user(db, user, **updated_fields)
 
             if user.status == 'Need_Register':
-                return {
-                    "message": "Need_Register",
-                    "access_token": access_token,
-                    "refresh_token": refresh_token
-                }, 202
+                message = "Need_Register"
+                status_code = 202
             elif user.status == 'Active':
-                return {
-                    "message": "로그인 성공",
-                    "access_token": access_token,
-                    "refresh_token": refresh_token
-                }, 200
+                message = "로그인 성공"
+                status_code = 200
             else:
+                db.close()
                 raise HTTPException(status_code=400, detail="유효하지 않은 사용자 상태입니다.")
+
+        # 서버에서 JWT 토큰 생성
+        access_token = create_access_token(data={"uuid": user.uuid})
+        refresh_token = create_refresh_token(data={"uuid": user.uuid})
+
+        # 토큰 업데이트
+        create_or_update_token(
+            db,
+            user_uuid=user.uuid,
+            refresh_token=refresh_token
+        )
+
+        db.close()
+        return {
+            "message": message,
+            "access_token": access_token,
+            "refresh_token": refresh_token
+        }, status_code
 
     except Exception as e:
         db.close()
         raise HTTPException(status_code=500, detail=f"Error processing user info: {str(e)}")
-
 
 # 카카오 연결 해제 (unlink) 메소드
 @router.delete('/login/kakao/unregister', tags=["Login"])

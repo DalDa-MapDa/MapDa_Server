@@ -60,65 +60,50 @@ async def google_login(data: GoogleLoginData):
                 provider_user_name=provider_user_name,
                 status='Need_Register'
             )
-
-            # 서버에서 JWT 토큰 생성
-            access_token = create_access_token()
-            refresh_token = create_refresh_token()
-
-            # 토큰 저장
-            create_or_update_token(
-                db,
-                user_uuid=user.uuid,
-                refresh_token=refresh_token,
-                provider_type='GOOGLE',
-                provider_access_token=data.accessToken
-            )
-
-            db.close()
-            return {
-                "message": "Need_Register",
-                "access_token": access_token,
-                "refresh_token": refresh_token
-            }, 201
-
+            message = "Need_Register"
+            status_code = 201
         else:
             # 이메일, 프로필 이미지, 사용자 이름 업데이트
-            updated_fields = {
-                "email": email,
-                "provider_profile_image": provider_profile_image,
-                "provider_user_name": provider_user_name
-            }
-            user = update_user(db, user, **updated_fields)
+            updated_fields = {}
+            if email is not None:
+                updated_fields["email"] = email
+            if provider_profile_image is not None:
+                updated_fields["provider_profile_image"] = provider_profile_image
+            if provider_user_name is not None:
+                updated_fields["provider_user_name"] = provider_user_name
 
-            # 서버에서 JWT 토큰 생성
-            access_token = create_access_token()
-            refresh_token = create_refresh_token()
-
-            # 토큰 업데이트
-            create_or_update_token(
-                db,
-                user_uuid=user.uuid,
-                refresh_token=refresh_token,
-                provider_type='GOOGLE',
-                provider_access_token=data.accessToken
-            )
-
-            db.close()
+            if updated_fields:
+                user = update_user(db, user, **updated_fields)
 
             if user.status == 'Need_Register':
-                return {
-                    "message": "Need_Register",
-                    "access_token": access_token,
-                    "refresh_token": refresh_token
-                }, 202
+                message = "Need_Register"
+                status_code = 202
             elif user.status == 'Active':
-                return {
-                    "message": "로그인 성공",
-                    "access_token": access_token,
-                    "refresh_token": refresh_token
-                }, 200
+                message = "로그인 성공"
+                status_code = 200
             else:
+                db.close()
                 raise HTTPException(status_code=400, detail="유효하지 않은 사용자 상태입니다.")
+
+        # 서버에서 JWT 토큰 생성
+        access_token = create_access_token(data={"uuid": user.uuid})
+        refresh_token = create_refresh_token(data={"uuid": user.uuid})
+
+        # 토큰 업데이트
+        create_or_update_token(
+            db,
+            user_uuid=user.uuid,
+            refresh_token=refresh_token,
+            provider_type='GOOGLE',
+            provider_access_token=data.accessToken
+        )
+
+        db.close()
+        return {
+            "message": message,
+            "access_token": access_token,
+            "refresh_token": refresh_token
+        }, status_code
 
     except ValueError:
         db.close()
@@ -126,7 +111,6 @@ async def google_login(data: GoogleLoginData):
     except Exception as e:
         db.close()
         raise HTTPException(status_code=500, detail=f"Error processing user info: {str(e)}")
-
 
 # 구글 계정 연결 해제 (revoke) 메소드
 @router.delete("/login/google/unregister", tags=["Login"])
