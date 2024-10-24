@@ -1,5 +1,5 @@
 import os
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from google.oauth2 import id_token
@@ -26,7 +26,7 @@ class GoogleLoginData(BaseModel):
     accessToken: str  # access token 추가
 
 @router.post("/login/google", tags=["Login"])
-async def google_login(data: GoogleLoginData):
+async def google_login(data: GoogleLoginData, response: Response):
     # 데이터베이스 세션 생성
     db: Session = SessionLocal()
     try:
@@ -61,7 +61,7 @@ async def google_login(data: GoogleLoginData):
                 status='Need_Register'
             )
             message = "Need_Register"
-            status_code = 201
+            response.status_code = 201  # 상태 코드를 201로 설정
         else:
             # 이메일, 프로필 이미지, 사용자 이름 업데이트
             updated_fields = {}
@@ -77,10 +77,10 @@ async def google_login(data: GoogleLoginData):
 
             if user.status == 'Need_Register':
                 message = "Need_Register"
-                status_code = 202
+                response.status_code = 202  # 상태 코드를 202로 설정
             elif user.status == 'Active':
                 message = "로그인 성공"
-                status_code = 200
+                response.status_code = 200  # 상태 코드를 200으로 설정
             else:
                 db.close()
                 raise HTTPException(status_code=400, detail="유효하지 않은 사용자 상태입니다.")
@@ -103,7 +103,7 @@ async def google_login(data: GoogleLoginData):
             "message": message,
             "access_token": access_token,
             "refresh_token": refresh_token
-        }, status_code
+        }
 
     except ValueError:
         db.close()
@@ -114,7 +114,7 @@ async def google_login(data: GoogleLoginData):
 
 # 구글 계정 연결 해제 (revoke) 메소드
 @router.delete("/login/google/unregister", tags=["Login"])
-async def google_unregister(user_access_token: str):
+async def google_unregister(user_access_token: str, response: Response):
     try:
         # 구글 revoke URL
         revoke_url = f"https://accounts.google.com/o/oauth2/revoke?token={user_access_token}"
@@ -123,6 +123,7 @@ async def google_unregister(user_access_token: str):
         revoke_response = requests.post(revoke_url)
 
         if revoke_response.status_code == 200:
+            response.status_code = 200  # 상태 코드를 200으로 설정
             return {"message": "구글 계정 연결 해제 성공"}
         else:
             raise HTTPException(

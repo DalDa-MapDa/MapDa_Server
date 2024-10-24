@@ -1,5 +1,5 @@
+from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
-from fastapi import APIRouter, HTTPException
 import requests
 import jwt  # PyJWT 라이브러리
 import datetime
@@ -40,12 +40,12 @@ class AppleLoginData(BaseModel):
     userName: str   # 새로운 필드 추가
 
 @router.post('/login/apple', tags=["Login"])
-async def apple_login(data: AppleLoginData):
+async def apple_login(data: AppleLoginData, response: Response):
     # 데이터베이스 세션 생성
     db: Session = SessionLocal()
     try:
         # 1. 애플로부터 받은 authorizationCode로 토큰 요청
-        response = requests.post(
+        token_response = requests.post(
             'https://appleid.apple.com/auth/token',
             data={
                 'client_id': APPLE_CLIENT_ID,
@@ -60,11 +60,11 @@ async def apple_login(data: AppleLoginData):
         raise HTTPException(status_code=500, detail="애플 인증 요청 중 오류 발생")
 
     # 애플 인증 실패 시 오류 처리
-    if response.status_code != 200:
+    if token_response.status_code != 200:
         db.close()
-        raise HTTPException(status_code=response.status_code, detail="애플 인증 실패")
+        raise HTTPException(status_code=token_response.status_code, detail="애플 인증 실패")
 
-    token_data = response.json()
+    token_data = token_response.json()
 
     # 2. ID 토큰 디코딩 및 검증
     decoded_token = verify_and_decode_identity_token(token_data.get('id_token'))
@@ -93,17 +93,16 @@ async def apple_login(data: AppleLoginData):
             apple_real_user_status=decoded_token.get('real_user_status'),
             status='Need_Register'  # 상태를 Need_Register로 설정
         )
-
         message = "Need_Register"
-        status_code = 201
+        response.status_code = 201  # 상태 코드를 201로 설정
 
     elif user.status == 'Need_Register':
         message = "Need_Register"
-        status_code = 202
+        response.status_code = 202  # 상태 코드를 202로 설정
 
     elif user.status == 'Active':
         message = "로그인 성공"
-        status_code = 200
+        response.status_code = 200  # 상태 코드를 200으로 설정
 
     else:
         db.close()
@@ -127,7 +126,7 @@ async def apple_login(data: AppleLoginData):
         "message": message,
         "access_token": access_token,
         "refresh_token": refresh_token
-    }, status_code
+    }
 
 # 클라이언트 시크릿 생성 함수
 def create_client_secret():

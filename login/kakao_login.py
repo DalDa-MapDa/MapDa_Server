@@ -1,7 +1,7 @@
 import os
 from pydantic import BaseModel
 import requests
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 from dotenv import load_dotenv
 from typing import Optional
 from sqlalchemy.orm import Session
@@ -31,7 +31,7 @@ class KakaoUserInfo(BaseModel):
 
 # 카카오 로그인 정보 받기 엔드포인트
 @router.post('/login/kakao', tags=["Login"])
-async def kakao_login(user_info: KakaoUserInfo):
+async def kakao_login(user_info: KakaoUserInfo, response: Response):
     # 데이터베이스 세션 생성
     db: Session = SessionLocal()
     try:
@@ -47,10 +47,7 @@ async def kakao_login(user_info: KakaoUserInfo):
         }
 
         # provider_profile_image 설정
-        if user_data['isProfileImageDefault']:
-            provider_profile_image = None
-        else:
-            provider_profile_image = user_data['profileImage']
+        provider_profile_image = None if user_data['isProfileImageDefault'] else user_data['profileImage']
 
         # 사용자 존재 여부 확인
         user = get_user_by_provider(db, 'KAKAO', user_data['id'])
@@ -67,7 +64,7 @@ async def kakao_login(user_info: KakaoUserInfo):
                 status='Need_Register'  # 상태를 Need_Register로 설정
             )
             message = "Need_Register"
-            status_code = 201
+            response.status_code = 201  # 상태 코드를 201로 설정
         else:
             # 이메일, 프로필 이미지, 닉네임 업데이트
             updated_fields = {}
@@ -83,10 +80,10 @@ async def kakao_login(user_info: KakaoUserInfo):
 
             if user.status == 'Need_Register':
                 message = "Need_Register"
-                status_code = 202
+                response.status_code = 202  # 상태 코드를 202로 설정
             elif user.status == 'Active':
                 message = "로그인 성공"
-                status_code = 200
+                response.status_code = 200  # 상태 코드를 200으로 설정
             else:
                 db.close()
                 raise HTTPException(status_code=400, detail="유효하지 않은 사용자 상태입니다.")
@@ -108,7 +105,7 @@ async def kakao_login(user_info: KakaoUserInfo):
             "message": message,
             "access_token": access_token,
             "refresh_token": refresh_token
-        }, status_code
+        }
 
     except Exception as e:
         db.close()
@@ -116,7 +113,7 @@ async def kakao_login(user_info: KakaoUserInfo):
 
 # 카카오 연결 해제 (unlink) 메소드
 @router.delete('/login/kakao/unregister', tags=["Login"])
-async def kakao_unregister(user_id: str):
+async def kakao_unregister(user_id: str, response: Response):
     if not KAKAO_ADMIN_KEY:
         raise HTTPException(status_code=500, detail="KAKAO_ADMIN_KEY가 설정되지 않았습니다.")
 
@@ -133,7 +130,8 @@ async def kakao_unregister(user_id: str):
     # POST 요청으로 연결 해제
     unregister_response = requests.post('https://kapi.kakao.com/v1/user/unlink', headers=headers, data=unregister_data)
     
-    if unregister_response.status_code != 200:
+    if unregister_response.status_code == 200:
+        response.status_code = 200  # 상태 코드를 200으로 설정
+        return {"message": "카카오 사용자 연결이 성공적으로 해제되었습니다."}
+    else:
         raise HTTPException(status_code=unregister_response.status_code, detail="카카오 사용자 연결 해제 실패")
-
-    return {"message": "카카오 사용자 연결이 성공적으로 해제되었습니다."}
