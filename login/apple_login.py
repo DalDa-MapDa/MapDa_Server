@@ -110,7 +110,7 @@ async def apple_login(data: AppleLoginData):
         raise HTTPException(status_code=400, detail="유효하지 않은 사용자 상태입니다.")
 
     # 서버에서 JWT 토큰 생성
-    access_token = create_access_token(data={"uuid": user.uuid})
+    access_token = create_access_token(uuid=user.uuid)
     refresh_token = create_refresh_token()
 
     # 토큰 업데이트
