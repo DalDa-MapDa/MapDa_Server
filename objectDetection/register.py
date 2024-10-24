@@ -20,7 +20,7 @@ S3_BUCKET = os.getenv('S3_BUCKET_NAME')
 
 router = APIRouter()
 
-@router.post("/register", tags=["Object"])
+@router.post("api/v1/register", tags=["Object"])
 async def register_object(
     request: Request,  # Request 추가
     latitude: float = Form(...),

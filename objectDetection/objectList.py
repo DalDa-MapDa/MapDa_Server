@@ -5,7 +5,7 @@ from models import SessionLocal, UserObject
 
 router = APIRouter()
 
-@router.get("/get_object_list", tags=["Object"])
+@router.get("api/v1/get_object_list", tags=["Object"])
 async def get_object_list():
     try:
         # DB 세션 생성
@@ -38,7 +38,7 @@ async def get_object_list():
     finally:
         db.close()
 
-@router.get("/get_specific_object/{id}", tags=["Object"])
+@router.get("api/v1/get_specific_object/{id}", tags=["Object"])
 async def get_specific_object(id: int):
     try:
         # DB 세션 생성

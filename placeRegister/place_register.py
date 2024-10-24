@@ -23,7 +23,7 @@ S3_BUCKET = os.getenv('S3_PLACE_BUCKET_NAME')
 
 router = APIRouter()
 
-@router.post("/register_moving_data", tags=["Place"])
+@router.post("api/v1/register_moving_data", tags=["Place"])
 async def register_moving_data(
     request: Request,  # Request 추가
     placeName: str = Form(...),

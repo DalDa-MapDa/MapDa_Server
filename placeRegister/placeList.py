@@ -5,7 +5,7 @@ from models import SessionLocal, Place, User  # User 모델 추가
 
 router = APIRouter()
 
-@router.get("/get_place_list", tags=["Place"])
+@router.get("api/v1/get_place_list", tags=["Place"])
 async def get_place_list():
     try:
         # DB 세션 생성
