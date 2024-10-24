@@ -99,6 +99,7 @@ async def kakao_login(user_info: KakaoUserInfo):
         create_or_update_token(
             db,
             user_uuid=user.uuid,
+            provider_type='KAKAO',
             refresh_token=refresh_token
         )
 
