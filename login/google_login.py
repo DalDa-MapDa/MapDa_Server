@@ -35,7 +35,7 @@ async def google_login(data: GoogleLoginData):
             data.idToken, google_requests.Request(), None
         )
 
-        # 클라이언트 ID 확인 (GOOGLE_CLIENT_IDS 중 하나와 일치하는지 확인)
+        # 클라이언트 ID 확인
         if id_info['aud'] not in GOOGLE_CLIENT_IDS:
             db.close()
             raise HTTPException(status_code=400, detail="Invalid client ID")

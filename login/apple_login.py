@@ -82,7 +82,7 @@ async def apple_login(data: AppleLoginData):
     user = get_user_by_provider(db, 'APPLE', provider_id)
 
     if not user:
-        # 새로운 유저이므로 생성
+        # 새로운 유저 생성
         user = create_user(
             db,
             email=data.userEmail if data.userEmail else None,
@@ -94,77 +94,42 @@ async def apple_login(data: AppleLoginData):
             status='Need_Register'  # 상태를 Need_Register로 설정
         )
 
-        # 서버에서 JWT 토큰 생성
-        access_token = create_access_token()
-        refresh_token = create_refresh_token()
-
-        # 토큰 저장
-        create_or_update_token(
-            db,
-            user_uuid=user.uuid,
-            refresh_token=refresh_token,
-            provider_type='APPLE',
-            provider_refresh_token=token_data.get('refresh_token')
-        )
-
-        db.close()
-        return {
-            "message": "Need_Register",
-            "access_token": access_token,
-            "refresh_token": refresh_token
-        }, 201
+        message = "Need_Register"
+        status_code = 201
 
     elif user.status == 'Need_Register':
-        # 이미 회원가입은 했으나 추가 정보가 필요한 상태
-
-        # 서버에서 JWT 토큰 생성
-        access_token = create_access_token()
-        refresh_token = create_refresh_token()
-
-        # 토큰 업데이트
-        create_or_update_token(
-            db,
-            user_uuid=user.uuid,
-            refresh_token=refresh_token,
-            provider_type='APPLE',
-            provider_refresh_token=token_data.get('refresh_token')
-        )
-
-        db.close()
-        return {
-            "message": "Need_Register",
-            "access_token": access_token,
-            "refresh_token": refresh_token
-        }, 202
+        message = "Need_Register"
+        status_code = 202
 
     elif user.status == 'Active':
-        # 기존 유저이며 Active 상태
-
-        # 서버에서 JWT 토큰 생성
-        access_token = create_access_token()
-        refresh_token = create_refresh_token()
-
-        # 토큰 업데이트
-        create_or_update_token(
-            db,
-            user_uuid=user.uuid,
-            refresh_token=refresh_token,
-            provider_type='APPLE',
-            provider_refresh_token=token_data.get('refresh_token')
-        )
-
-        db.close()
-        return {
-            "message": "로그인 성공",
-            "access_token": access_token,
-            "refresh_token": refresh_token
-        }, 200
+        message = "로그인 성공"
+        status_code = 200
 
     else:
         db.close()
         raise HTTPException(status_code=400, detail="유효하지 않은 사용자 상태입니다.")
 
-# 클라이언트 시크릿 생성 함수 (생략)
+    # 서버에서 JWT 토큰 생성
+    access_token = create_access_token(data={"uuid": user.uuid})
+    refresh_token = create_refresh_token(data={"uuid": user.uuid})
+
+    # 토큰 업데이트
+    create_or_update_token(
+        db,
+        user_uuid=user.uuid,
+        refresh_token=refresh_token,
+        provider_type='APPLE',
+        provider_refresh_token=token_data.get('refresh_token')
+    )
+
+    db.close()
+    return {
+        "message": message,
+        "access_token": access_token,
+        "refresh_token": refresh_token
+    }, status_code
+
+# 클라이언트 시크릿 생성 함수
 def create_client_secret():
     headers = {
         "kid": APPLE_KEY_ID,
@@ -183,7 +148,7 @@ def create_client_secret():
     except Exception:
         raise HTTPException(status_code=500, detail="클라이언트 시크릿 생성 중 오류 발생")
 
-# identityToken 디코딩 및 검증 함수 (생략)
+# identityToken 디코딩 및 검증 함수
 def verify_and_decode_identity_token(identity_token: str) -> dict:
     try:
         decoded_token = jwt.decode(identity_token, options={"verify_signature": False})
@@ -191,18 +156,16 @@ def verify_and_decode_identity_token(identity_token: str) -> dict:
     except jwt.InvalidTokenError:
         return None
 
-
 # 회원 탈퇴 로직
 @router.delete('/login/apple/unregister', tags=["Login"])
 async def apple_unregister(user_refresh_token: str):
-    # 저장된 refresh_token을 이용해 애플 회원 탈퇴 요청
     try:
         response = requests.post(
             'https://appleid.apple.com/auth/revoke',
             data={
                 'client_id': APPLE_CLIENT_ID,
                 'client_secret': create_client_secret(),
-                'token': user_refresh_token,  # 저장된 refresh_token 사용
+                'token': user_refresh_token,
                 'token_type_hint': 'refresh_token'
             },
             headers={
@@ -212,7 +175,6 @@ async def apple_unregister(user_refresh_token: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail="애플 회원 탈퇴 요청 중 오류 발생")
 
-    # 탈퇴 요청 실패 시 처리
     if response.status_code != 200:
         raise HTTPException(status_code=response.status_code, detail="애플 회원 탈퇴 실패")
 

@@ -22,7 +22,6 @@ def get_user_by_provider(db: Session, provider_type: str, provider_id: str):
         User.status != 'Deleted'  # Deleted 상태의 사용자는 제외
     ).first()
 
-
 def create_user(db: Session, **kwargs):
     user = User(**kwargs)
     db.add(user)
@@ -51,16 +50,16 @@ def create_or_update_token(db: Session, user_uuid: str, **kwargs):
         db.refresh(token)
     return token
 
-def create_access_token():
-    """액세스 토큰 생성, UUID 포함 안 함"""
+def create_access_token(data: dict):
+    to_encode = data.copy()
     expire = datetime.datetime.utcnow() + datetime.timedelta(seconds=ACCESS_TOKEN_EXPIRE_SECONDS)
-    to_encode = {"exp": expire}  # UUID는 포함하지 않고 만료 시간만 추가
+    to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
     return encoded_jwt
 
-def create_refresh_token():
-    """리프레시 토큰 생성, UUID 포함 안 함"""
+def create_refresh_token(data: dict):
+    to_encode = data.copy()
     expire = datetime.datetime.utcnow() + datetime.timedelta(seconds=REFRESH_TOKEN_EXPIRE_SECONDS)
-    to_encode = {"exp": expire}  # UUID는 포함하지 않고 만료 시간만 추가
+    to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
     return encoded_jwt
