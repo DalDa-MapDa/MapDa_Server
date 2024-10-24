@@ -45,6 +45,7 @@ PUBLIC_PATH_PREFIXES = [
     "/openapi.json",
     "/static",
     "/auth",  # '/auth'로 시작하는 모든 경로
+    "/proxy",
 ]
 
 # 인증 미들웨어
