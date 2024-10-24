@@ -87,8 +87,8 @@ async def google_login(data: GoogleLoginData):
 
         # 서버에서 JWT 토큰 생성
         access_token = create_access_token(data={"uuid": user.uuid})
-        refresh_token = create_refresh_token(data={"uuid": user.uuid})
-
+        refresh_token = create_refresh_token()
+        
         # 토큰 업데이트
         create_or_update_token(
             db,
