@@ -113,7 +113,7 @@ async def google_login(data: GoogleLoginData, response: Response):
         raise HTTPException(status_code=500, detail=f"Error processing user info: {str(e)}")
 
 # 구글 계정 연결 해제 (revoke) 메소드
-@router.delete("/login/google/unregister", tags=["Login"])
+@router.delete("api/v1/login/google/unregister", tags=["Unregister"])
 async def google_unregister(user_access_token: str, response: Response):
     try:
         # 구글 revoke URL
