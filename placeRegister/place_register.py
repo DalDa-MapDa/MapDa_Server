@@ -1,13 +1,14 @@
 from datetime import datetime
 import os
 import uuid
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Request
 from pydantic import BaseModel
 from typing import List, Dict
 import boto3
 from sqlalchemy.orm import Session
-from models import SessionLocal, Place, PlaceIndoor, PlaceOutdoor
+from models import SessionLocal, Place, PlaceIndoor, PlaceOutdoor, User  # User 모델 임포트
 from dotenv import load_dotenv
+import json  # json 모듈 추가
 
 load_dotenv()
 
@@ -22,20 +23,9 @@ S3_BUCKET = os.getenv('S3_PLACE_BUCKET_NAME')
 
 router = APIRouter()
 
-class MovingData(BaseModel):
-    placeName: str
-    selectedLocation: Dict[str, float]
-    wheeleChaitAccessible: int
-    restRoomExist: int = None
-    restRoomFloor: int = None
-    elevatorAccessible: int = None
-    rampAccessible: int = None
-    inDoorImage: List[UploadFile] = None
-    outDoorImage: List[UploadFile] = None
-
 @router.post("/register_moving_data", tags=["Place"])
 async def register_moving_data(
-    userID: int = Form(...),
+    request: Request,  # Request 추가
     placeName: str = Form(...),
     selectedLocation: str = Form(...),
     wheeleChaitAccessible: int = Form(...),
@@ -47,13 +37,27 @@ async def register_moving_data(
     outDoorImage: List[UploadFile] = File(None)
 ):
     try:
-        # DB 세션 생성
+        # 인증된 사용자 UUID 가져오기
+        user_uuid = request.state.user_uuid
+
+        # 데이터베이스 세션 생성
         db: Session = SessionLocal()
 
+        # 사용자 정보 조회
+        user = db.query(User).filter(User.uuid == user_uuid).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+
+        # 사용자 ID 가져오기
+        user_id = user.id
+
         # JSON 문자열을 파싱하여 위치 정보 추출
-        location = eval(selectedLocation)
-        latitude = location.get('latitude')
-        longitude = location.get('longitude')
+        try:
+            location = json.loads(selectedLocation)
+            latitude = location.get('latitude')
+            longitude = location.get('longitude')
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="잘못된 위치 정보입니다.")
 
         # 이미지를 S3에 업로드하고 URL 리스트 생성
         def upload_files(files):
@@ -78,16 +82,10 @@ async def register_moving_data(
         in_door_image_urls = upload_files(inDoorImage) if inDoorImage else []
         out_door_image_urls = upload_files(outDoorImage) if outDoorImage else []
 
-        # UUID 생성 로직
-        seq_num = db.query(Place).filter(
-            Place.created_at.like(f"{datetime.utcnow().date()}%")
-        ).count() + 1
-        uuid_code = f"P{datetime.utcnow().strftime('%Y%m%d')}{seq_num:04d}"
-
-        # DB에 정보 저장
+        # Place 객체 생성
         db_place = Place(
-            uuid=uuid_code,
-            user_id=userID,
+            user_id=user_id,
+            created_uuid=user_uuid,
             place_name=placeName,
             latitude=latitude,
             longitude=longitude,
@@ -112,11 +110,18 @@ async def register_moving_data(
         
         db.commit()
 
-        return {"id": db_place.id, "uuid": db_place.uuid, "place_name": db_place.place_name}
+        return {
+            "id": db_place.id,
+            "resource_id": db_place.resource_id,
+            "place_name": db_place.place_name
+        }
 
+    except HTTPException as e:
+        # 이미 발생한 HTTPException은 그대로 다시 발생시킵니다.
+        raise e
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {str(e)}")
 
     finally:
         db.close()
