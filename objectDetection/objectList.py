@@ -38,7 +38,7 @@ async def get_object_list():
     finally:
         db.close()
 
-@router.get("api/v1/get_specific_object/{id}", tags=["Object"])
+@router.get("/api/v1/get_specific_object/{id}", tags=["Object"])
 async def get_specific_object(id: int):
     try:
         # DB 세션 생성
