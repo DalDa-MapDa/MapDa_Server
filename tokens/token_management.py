@@ -1,5 +1,5 @@
 import jwt
-from jwt import PyJWTError
+from jwt import PyJWTError, ExpiredSignatureError
 import os
 from dotenv import load_dotenv
 import datetime
@@ -13,7 +13,7 @@ load_dotenv()
 JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
 JWT_ALGORITHM = 'HS256'
 
-ACCESS_TOKEN_EXPIRE_SECONDS = 3600    # 1시간
+ACCESS_TOKEN_EXPIRE_SECONDS = 10    # 10초
 
 router = APIRouter()
 
@@ -22,17 +22,21 @@ def verify_access_token(token: str):
         payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
         uuid: str = payload.get("uuid")
         if uuid is None:
-            return None
+            return "411"  # Invalid token structure
         return uuid
+    except jwt.ExpiredSignatureError:
+        return "410"  # Token expired
     except PyJWTError:
-        return None
+        return "412"  # Other token errors
 
 def verify_refresh_token(token: str):
     try:
         jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
         return True
+    except jwt.ExpiredSignatureError:
+        return "420"  # Refresh token expired
     except PyJWTError:
-        return False
+        return "421"  # Other refresh token errors
 
 def create_access_token(uuid: str):
     """액세스 토큰 생성, UUID 포함"""
@@ -49,8 +53,9 @@ class RefreshTokenRequest(BaseModel):
 async def refresh_access_token_endpoint(refresh_request: RefreshTokenRequest):
     refresh_token = refresh_request.refresh_token
     # 리프레시 토큰 유효성 검증
-    if not verify_refresh_token(refresh_token):
-        raise HTTPException(status_code=401, detail="유효하지 않은 리프레시 토큰입니다.")
+    verify_result = verify_refresh_token(refresh_token)
+    if verify_result in ["420", "421"]:
+        raise HTTPException(status_code=int(verify_result), detail="유효하지 않은 리프레시 토큰입니다.")
     # 데이터베이스 세션 생성
     db: Session = SessionLocal()
     try:
