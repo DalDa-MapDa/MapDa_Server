@@ -109,7 +109,7 @@ class Place(Base):
     place_name = Column(String(255), nullable=False)
     latitude = Column(Float, nullable=False)
     longitude = Column(Float, nullable=False)
-    wheele_chait_accessible = Column(Integer, nullable=False)
+    wheele_chair_accessible = Column(Integer, nullable=False)
     rest_room_exist = Column(Integer, nullable=True)
     rest_room_floor = Column(Integer, nullable=True)
     elevator_accessible = Column(Integer, nullable=True)

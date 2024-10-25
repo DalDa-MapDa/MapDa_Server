@@ -28,7 +28,7 @@ async def register_moving_data(
     request: Request,  # Request 추가
     placeName: str = Form(...),
     selectedLocation: str = Form(...),
-    wheeleChaitAccessible: int = Form(...),
+    wheeleChairAccessible: int = Form(...),
     restRoomExist: int = Form(None),
     restRoomFloor: int = Form(None),
     elevatorAccessible: int = Form(None),
@@ -89,7 +89,7 @@ async def register_moving_data(
             place_name=placeName,
             latitude=latitude,
             longitude=longitude,
-            wheele_chait_accessible=wheeleChaitAccessible,
+            wheele_chair_accessible=wheeleChairAccessible,
             rest_room_exist=restRoomExist,
             rest_room_floor=restRoomFloor,
             elevator_accessible=elevatorAccessible,

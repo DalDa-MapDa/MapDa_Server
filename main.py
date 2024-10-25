@@ -69,8 +69,8 @@ async def authentication_middleware(request: Request, call_next):
 
     # 토큰 검증
     user_uuid = token_management.verify_access_token(token)
-    if user_uuid in ["410", "411", "412"]:
-        return Response(content="유효하지 않은 토큰입니다.", status_code=int(user_uuid))
+    if not user_uuid:
+        return Response(content="유효하지 않은 토큰입니다.", status_code=401)
 
     # 요청 상태에 사용자 UUID 저장
     request.state.user_uuid = user_uuid
