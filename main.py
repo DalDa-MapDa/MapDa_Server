@@ -79,15 +79,15 @@ async def authentication_middleware(request: Request, call_next):
     return response
 
 # # UTF-8 인코딩을 적용하는 미들웨어
-# @app.middleware("http")
-# async def add_utf8_encoding(request: Request, call_next):
-#     response = await call_next(request)
-#     # 모든 응답에 Content-Type을 설정하여 UTF-8 인코딩을 적용
-#     if "text" in response.headers.get("content-type", ""):
-#         response.headers["Content-Type"] = "text/html; charset=utf-8"
-#     elif "application/json" in response.headers.get("content-type", ""):
-#         response.headers["Content-Type"] = "application/json; charset=utf-8"
-#     return response
+@app.middleware("http")
+async def add_utf8_encoding(request: Request, call_next):
+    response = await call_next(request)
+    # 모든 응답에 Content-Type을 설정하여 UTF-8 인코딩을 적용
+    if "text" in response.headers.get("content-type", ""):
+        response.headers["Content-Type"] = "text/html; charset=utf-8"
+    elif "application/json" in response.headers.get("content-type", ""):
+        response.headers["Content-Type"] = "application/json; charset=utf-8"
+    return response
 
 # OpenAPI 스키마 커스터마이징
 def custom_openapi():
