@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Date, Enum, ForeignKey, func
+from sqlalchemy import Time, create_engine, Column, Integer, String, Float, DateTime, Date, Enum, ForeignKey, func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from dotenv import load_dotenv
@@ -145,6 +145,21 @@ class PlaceOutdoor(Base):
     id = Column(Integer, primary_key=True, index=True)
     place_id = Column(Integer, ForeignKey('places_data.id'), nullable=False)
     image_url = Column(String(255), nullable=False)
+
+class UserTimetable(Base):
+    __tablename__ = 'user_timetable'
+
+    id = Column(Integer, primary_key=True, index=True)
+    lname = Column(String(255), nullable=False)  # 강의 이름
+    day = Column(String(10), nullable=False)  # 요일
+    start_time = Column(Time, nullable=False)  # 강의 시작 시간
+    end_time = Column(Time, nullable=False)  # 강의 종료 시간
+    classroom = Column(String(255), nullable=True)  # 강의실 (NULL 허용)
+    created_uuid = Column(String(21), ForeignKey('users.uuid'), nullable=False)  # 사용자 UUID
+
+    user = relationship('User', back_populates='timetables')  # User와 관계 설정
+
+User.timetables = relationship('UserTimetable', back_populates='user')  # 관계 설정
 
 # Create all tables
 Base.metadata.create_all(bind=engine)

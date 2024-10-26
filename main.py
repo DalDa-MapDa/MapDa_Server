@@ -5,6 +5,7 @@ from objectDetection import register, objectList
 from placeRegister import place_register, placeList
 from proxy import proxy_server
 from login import kakao_login, apple_login, google_login
+from userData.timeTable  import timeTable_register  # 추가: timeTable_register.py에서 라우터 임포트
 import uvicorn
 from tokens import token_management
 
@@ -29,6 +30,8 @@ app.include_router(kakao_login.router)
 app.include_router(apple_login.router)
 app.include_router(google_login.router)
 app.include_router(token_management.router)
+app.include_router(timeTable_register.router)
+
 
 # 인증이 필요하지 않은 경로 목록
 PUBLIC_PATHS = [
