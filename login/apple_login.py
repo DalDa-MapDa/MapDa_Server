@@ -156,7 +156,7 @@ def verify_and_decode_identity_token(identity_token: str) -> dict:
         return None
 
 # 회원 탈퇴 로직
-@router.delete('api/v1/login/apple/unregister', tags=["Unregister"])
+@router.delete('/api/v1/login/apple/unregister', tags=["Unregister"])
 async def apple_unregister(user_refresh_token: str):
     try:
         response = requests.post(

@@ -112,7 +112,7 @@ async def kakao_login(user_info: KakaoUserInfo, response: Response):
         raise HTTPException(status_code=500, detail=f"Error processing user info: {str(e)}")
 
 # 카카오 연결 해제 (unlink) 메소드
-@router.delete('api/v1/login/kakao/unregister', tags=["Unregister"])
+@router.delete('/api/v1/login/kakao/unregister', tags=["Unregister"])
 async def kakao_unregister(user_id: str, response: Response):
     if not KAKAO_ADMIN_KEY:
         raise HTTPException(status_code=500, detail="KAKAO_ADMIN_KEY가 설정되지 않았습니다.")
