@@ -7,6 +7,7 @@ from datetime import datetime
 
 load_dotenv()
 
+# Database connection setup
 DATABASE_URL = f"mysql+pymysql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@" \
                f"{os.getenv('DB_ENDPOINT')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
 
@@ -14,10 +15,12 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
+# Function to generate unique IDs
 def generate_uuid(prefix: str, date: datetime, seq_num: int) -> str:
     date_str = date.strftime('%Y%m%d')  # YYYYMMDD format
     return f"{prefix}{date_str}{seq_num:011d}"  # Adjusted to make total length 21 characters
 
+# User model definition
 class User(Base):
     __tablename__ = 'users'
 
@@ -43,11 +46,12 @@ class User(Base):
     tokens = relationship('Token', back_populates='user')
     user_objects = relationship('UserObject', back_populates='user')
     places = relationship('Place', back_populates='user')
+    timetables = relationship('UserTimetable', back_populates='user')  # Relationship with UserTimetable
 
+    # UUID generation logic
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if not self.uuid:
-            # Generate UUID
             session = SessionLocal()
             seq_num = session.query(func.count(User.id)).filter(
                 func.date(User.created_at) == datetime.utcnow().date()
@@ -55,6 +59,7 @@ class User(Base):
             session.close()
             self.uuid = generate_uuid("U", datetime.utcnow(), seq_num)
 
+# Token model definition
 class Token(Base):
     __tablename__ = 'tokens'
 
@@ -71,12 +76,15 @@ class Token(Base):
     # Relationship
     user = relationship('User', back_populates='tokens')
 
+# UserObject model definition
 class UserObject(Base):
     __tablename__ = 'user_objects'
 
     id = Column(Integer, primary_key=True, index=True)
     resource_id = Column(String(21), unique=True, nullable=False, index=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    status = Column(Enum('Active', 'Block', 'Deleted', name='user_object_status'), default='Active', nullable=False)
     user_id = Column(Integer, nullable=False)
     latitude = Column(Float, nullable=False)
     longitude = Column(Float, nullable=False)
@@ -91,7 +99,6 @@ class UserObject(Base):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if not self.resource_id:
-            # Generate resource_id starting with 'UO'
             session = SessionLocal()
             seq_num = session.query(func.count(UserObject.id)).filter(
                 func.date(UserObject.created_at) == datetime.utcnow().date()
@@ -99,12 +106,15 @@ class UserObject(Base):
             session.close()
             self.resource_id = generate_uuid("UO", datetime.utcnow(), seq_num)
 
+# Place model definition
 class Place(Base):
     __tablename__ = 'places_data'
 
     id = Column(Integer, primary_key=True, index=True)
     resource_id = Column(String(21), unique=True, nullable=False, index=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    status = Column(Enum('Active', 'Block', 'Deleted', name='user_object_status'), default='Active', nullable=False)
     user_id = Column(Integer, nullable=False)
     place_name = Column(String(255), nullable=False)
     latitude = Column(Float, nullable=False)
@@ -124,7 +134,6 @@ class Place(Base):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if not self.resource_id:
-            # Generate resource_id starting with 'PD'
             session = SessionLocal()
             seq_num = session.query(func.count(Place.id)).filter(
                 func.date(Place.created_at) == datetime.utcnow().date()
@@ -132,6 +141,7 @@ class Place(Base):
             session.close()
             self.resource_id = generate_uuid("PD", datetime.utcnow(), seq_num)
 
+# PlaceIndoor model definition
 class PlaceIndoor(Base):
     __tablename__ = 'place_indoor'
 
@@ -139,6 +149,7 @@ class PlaceIndoor(Base):
     place_id = Column(Integer, ForeignKey('places_data.id'), nullable=False)
     image_url = Column(String(255), nullable=False)
 
+# PlaceOutdoor model definition
 class PlaceOutdoor(Base):
     __tablename__ = 'place_outdoor'
 
@@ -146,6 +157,7 @@ class PlaceOutdoor(Base):
     place_id = Column(Integer, ForeignKey('places_data.id'), nullable=False)
     image_url = Column(String(255), nullable=False)
 
+# UserTimetable model definition
 class UserTimetable(Base):
     __tablename__ = 'user_timetable'
 
@@ -156,10 +168,12 @@ class UserTimetable(Base):
     end_time = Column(Time, nullable=False)  # 강의 종료 시간
     classroom = Column(String(255), nullable=True)  # 강의실 (NULL 허용)
     created_uuid = Column(String(21), ForeignKey('users.uuid'), nullable=False)  # 사용자 UUID
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)  # 최초 생성 시간
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)  # 마지막 업데이트 시간
+    user_object_status = Column(Enum('Active', 'Block', 'Deleted', name='user_object_status'), default='Active', nullable=False)
 
-    user = relationship('User', back_populates='timetables')  # User와 관계 설정
+    # Relationship
+    user = relationship('User', back_populates='timetables')
 
-User.timetables = relationship('UserTimetable', back_populates='user')  # 관계 설정
-
-# Create all tables
+# Create all tables in the database
 Base.metadata.create_all(bind=engine)
