@@ -27,19 +27,23 @@ OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
 # OpenAI API 요청 시 사용할 프롬프트 (영어로 번역)
 gpt_prompt = """
-This image is a timetable image containing the class name, start time, end time, day of the week, and class location.
-The class location is written in small text under the class name, but there may be cases where it is missing.
-Please extract the timetable information from this image in JSON format.
-The output format should be like this:
-[{
-    "lname": "Class name",
-    "day": "Day of the week",
-    "start_time": "HH:MM",
-    "end_time": "HH:MM",
-    "classroom": "Class location"
-}]
-If the classroom is missing, return null.
-Only output in JSON format.
+This image is a timetable that includes multiple course names, start times, end times, days, and classroom locations.
+The classroom is shown in smaller text below the course name, but it may be missing in some cases.
+The start time and end time are shown on the left side of the image, and you should use these times as a reference and follow the 24-hour format.
+Please extract all the course information from this image and output it as a JSON object with the following structure:
+{
+    "timetable": [
+        {
+            "lname": "Course Name",
+            "day": "Day",
+            "start_time": "HH:MM",
+            "end_time": "HH:MM",
+            "classroom": "Classroom"
+        },
+        ...
+    ]
+}
+If the classroom information is missing, set it to null. Ensure that all available course data is returned within the timetable array, following the format above.
 """
 
 # 시간표 데이터를 개별적으로 저장하는 함수
@@ -155,7 +159,7 @@ async def register_timetable_by_image(
         )
 
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4o",
             temperature=0.1,
             response_format={"type": "json_object"},
             messages=[
