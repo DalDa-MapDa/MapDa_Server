@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 import os
 from sqlalchemy.orm import Session
 from models import SessionLocal
-from login.login_token_manage import (
+from api.login.login_token_manage import (
     get_user_by_provider, create_user, create_or_update_token,
     create_access_token, create_refresh_token
 )
@@ -24,7 +24,7 @@ APPLE_TEAM_ID = os.getenv("APPLE_TEAM_ID")
 
 # AuthKey 파일에서 비밀키를 읽어오기
 auth_key_path = "/app/secrets/AuthKey_76ZFAC89DR.p8"  # 서버 경로
-# auth_key_path = "app/secrets/AuthKey_76ZFAC89DR.p8"  # 로컬 경로
+# auth_key_path = "secrets/AuthKey_76ZFAC89DR.p8"  # 로컬 경로
 
 try:
     with open(auth_key_path, "r") as key_file:
