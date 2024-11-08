@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker, relationship
 from dotenv import load_dotenv
 import os
 from datetime import datetime
-
+from data.university_info import UNIVERSITY_INFO
 load_dotenv()
 
 # Database connection setup
@@ -20,6 +20,9 @@ def generate_uuid(prefix: str, date: datetime, seq_num: int) -> str:
     date_str = date.strftime('%Y%m%d')  # YYYYMMDD format
     return f"{prefix}{date_str}{seq_num:011d}"  # Adjusted to make total length 21 characters
 
+# 대학 이름 목록을 가져오기 위한 함수
+university_names = list(UNIVERSITY_INFO.keys())
+
 # User model definition
 class User(Base):
     __tablename__ = 'users'
@@ -32,9 +35,7 @@ class User(Base):
     status = Column(Enum('Active', 'Block', 'Deleted', 'Need_Register', name='user_statuses'), default='Active', nullable=False)
     email = Column(String(255), unique=True, nullable=True)
     nickname = Column(String(255), nullable=True)
-    birth = Column(Date, nullable=True)
-    university = Column(Enum('MYONGJI_SEOUL', name='university_names'), nullable=True)
-    residence = Column(String(255), nullable=True)
+    university = Column(Enum(*university_names, name='university_names'), nullable=True)
     profile_number = Column(Integer, default=1, nullable=False)
     provider_type = Column(Enum('KAKAO', 'APPLE', 'GOOGLE', name='provider_types'), nullable=True)
     provider_id = Column(String(255), nullable=False)
