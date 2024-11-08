@@ -144,3 +144,46 @@ async def inquire_user_info(
         raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {str(e)}")
     finally:
         db.close()
+
+
+@router.post("/api/v1/userinfo/register_complete", tags=["User"])
+async def register_complete(
+    request: Request,
+    nickname: str = Form(...),
+    university: str = Form(...)
+):
+    db: Session = SessionLocal()
+    try:
+        # 인증된 사용자 UUID 가져오기 (토큰 검증을 위해 미들웨어 사용)
+        user_uuid = request.state.user_uuid
+
+        # 사용자 정보 조회
+        user = db.query(User).filter(User.uuid == user_uuid).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+
+        # nickname과 university 업데이트
+        user.nickname = nickname
+        user.university = university
+        user.status = "Active"  # 상태를 Active로 변경
+        user.updated_at = datetime.utcnow()  # 업데이트 시간 기록
+
+        # 변경 사항 커밋
+        db.commit()
+        db.refresh(user)  # 업데이트된 정보 반환 준비
+
+        return {
+            "uuid": user.uuid,
+            "nickname": user.nickname,
+            "university": user.university,
+            "status": user.status,
+            "updated_at": user.updated_at
+        }
+
+    except HTTPException as e:
+        raise e  # 이미 발생한 HTTPException을 그대로 다시 발생시킴
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {str(e)}")
+    finally:
+        db.close()
