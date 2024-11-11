@@ -22,7 +22,7 @@ router = APIRouter()
 
 @router.post("/api/v1/register", tags=["Object"])
 async def register_object(
-    request: Request,  # Request 추가
+    request: Request,
     latitude: float = Form(...),
     longitude: float = Form(...),
     objectName: str = Form(...),
@@ -42,16 +42,17 @@ async def register_object(
         if not user:
             raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
 
-        # 사용자 ID 가져오기
+        # 사용자 ID 및 대학 정보 가져오기
         user_id = user.id
+        user_university = user.university  # university 데이터 가져오기
 
         # S3에 이미지 업로드
         file_extension = imageData.filename.split('.')[-1]
         s3_filename = f"{uuid.uuid4()}.{file_extension}"
         imageData.file.seek(0)  # 파일 포인터를 시작 위치로 재설정
         s3_client.upload_fileobj(
-            imageData.file, 
-            S3_BUCKET, 
+            imageData.file,
+            S3_BUCKET,
             s3_filename,
             ExtraArgs={
                 'ContentType': f'image/{file_extension}',  # 적절한 MIME 타입 설정
@@ -67,7 +68,8 @@ async def register_object(
             longitude=longitude,
             object_name=objectName,
             place_name=placeName,
-            image_url=image_url
+            image_url=image_url,
+            university=user_university  # university 데이터 저장
         )
         db.add(db_object)
         db.commit()

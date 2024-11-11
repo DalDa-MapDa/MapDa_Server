@@ -25,7 +25,7 @@ router = APIRouter()
 
 @router.post("/api/v1/register_moving_data", tags=["Place"])
 async def register_moving_data(
-    request: Request,  # Request 추가
+    request: Request,
     placeName: str = Form(...),
     selectedLocation: str = Form(...),
     wheeleChairAccessible: int = Form(...),
@@ -48,8 +48,9 @@ async def register_moving_data(
         if not user:
             raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
 
-        # 사용자 ID 가져오기
+        # 사용자 ID 및 대학 정보 가져오기
         user_id = user.id
+        user_university = user.university  # university 데이터 가져오기
 
         # JSON 문자열을 파싱하여 위치 정보 추출
         try:
@@ -93,7 +94,8 @@ async def register_moving_data(
             rest_room_exist=restRoomExist,
             rest_room_floor=restRoomFloor,
             elevator_accessible=elevatorAccessible,
-            ramp_accessible=rampAccessible
+            ramp_accessible=rampAccessible,
+            university=user_university  # university 데이터 저장
         )
         db.add(db_place)
         db.commit()

@@ -93,6 +93,7 @@ class UserObject(Base):
     place_name = Column(String(255), nullable=False)
     image_url = Column(String(255), nullable=False)
     created_uuid = Column(String(21), ForeignKey('users.uuid'), nullable=False)
+    university = Column(Enum(*university_names, name='university_names'), nullable=True)  # 추가된 university 컬럼
 
     # Relationship
     user = relationship('User', back_populates='user_objects')
@@ -106,6 +107,7 @@ class UserObject(Base):
             ).scalar() + 1
             session.close()
             self.resource_id = generate_uuid("UO", datetime.utcnow(), seq_num)
+
 
 # Place model definition
 class Place(Base):
@@ -126,6 +128,7 @@ class Place(Base):
     elevator_accessible = Column(Integer, nullable=True)
     ramp_accessible = Column(Integer, nullable=True)
     created_uuid = Column(String(21), ForeignKey('users.uuid'), nullable=False)
+    university = Column(Enum(*university_names, name='university_names'), nullable=True)  # 추가된 university 컬럼
 
     # Relationships
     indoor_images = relationship("PlaceIndoor", backref="place")
@@ -141,6 +144,7 @@ class Place(Base):
             ).scalar() + 1
             session.close()
             self.resource_id = generate_uuid("PD", datetime.utcnow(), seq_num)
+
 
 # PlaceIndoor model definition
 class PlaceIndoor(Base):
