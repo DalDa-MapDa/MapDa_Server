@@ -40,7 +40,7 @@ class AppleLoginData(BaseModel):
     userName: str   # 새로운 필드 추가
 
 @router.post('/login/apple', tags=["Login"])
-def apple_login(data: AppleLoginData, response: Response):
+async def apple_login(data: AppleLoginData, response: Response):
     # 데이터베이스 세션 생성
     with SessionLocal() as db:
         try:
@@ -151,7 +151,7 @@ def verify_and_decode_identity_token(identity_token: str) -> dict:
 
 # 회원 탈퇴 로직
 @router.delete('/api/v1/login/apple/unregister', tags=["Unregister"])
-def apple_unregister(request: Request):
+async def apple_unregister(request: Request):
     # 액세스 토큰을 검증하고 사용자 UUID 가져오기
     user_uuid = request.state.user_uuid
 

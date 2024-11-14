@@ -27,7 +27,7 @@ class GoogleLoginData(BaseModel):
     accessToken: str  # access token 추가
 
 @router.post("/login/google", tags=["Login"])
-def google_login(data: GoogleLoginData, response: Response):
+async def google_login(data: GoogleLoginData, response: Response):
     # 데이터베이스 세션 생성
     db: Session = SessionLocal()
     try:
@@ -116,7 +116,7 @@ def google_login(data: GoogleLoginData, response: Response):
 
 # 구글 계정 연결 해제 (revoke) 메소드
 @router.delete("/api/v1/login/google/unregister", tags=["Unregister"])
-def google_unregister(request: Request):
+async def google_unregister(request: Request):
     # 사용자 UUID 가져오기
     user_uuid = request.state.user_uuid
 

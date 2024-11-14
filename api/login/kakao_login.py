@@ -32,7 +32,7 @@ class KakaoUserInfo(BaseModel):
 
 # 카카오 로그인 정보 받기 엔드포인트
 @router.post('/login/kakao', tags=["Login"])
-def kakao_login(user_info: KakaoUserInfo, response: Response):
+async def kakao_login(user_info: KakaoUserInfo, response: Response):
     # 데이터베이스 세션 생성
     db: Session = SessionLocal()
     try:
@@ -115,7 +115,7 @@ def kakao_login(user_info: KakaoUserInfo, response: Response):
 
 # 카카오 연결 해제 (unlink) 메소드
 @router.delete('/api/v1/login/kakao/unregister', tags=["Unregister"])
-def kakao_unregister(request: Request):
+async def kakao_unregister(request: Request):
     # 사용자 UUID 가져오기
     user_uuid = request.state.user_uuid
 
