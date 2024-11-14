@@ -161,6 +161,12 @@ async def inquire_user_info(
                 "univ_center_lng": None
             })
 
+        # university를 한글로 변환
+        for kor_name, eng_name in UNIVERSITY_KOR_ENG_DATA.items():
+            if user_info["university"] == eng_name:
+                user_info["university"] = kor_name
+                break
+
         return user_info
 
     except HTTPException as e:
@@ -170,6 +176,7 @@ async def inquire_user_info(
         raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {str(e)}")
     finally:
         db.close()
+
 
 @router.get("/api/v1/userinfo/check_nickname", tags=["User"])
 async def check_nickname(
