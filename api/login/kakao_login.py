@@ -1,7 +1,7 @@
 import os
 from pydantic import BaseModel
 import requests
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, HTTPException, Response, Request
 from dotenv import load_dotenv
 from typing import Optional
 from sqlalchemy.orm import Session
@@ -32,7 +32,7 @@ class KakaoUserInfo(BaseModel):
 
 # 카카오 로그인 정보 받기 엔드포인트
 @router.post('/login/kakao', tags=["Login"])
-async def kakao_login(user_info: KakaoUserInfo, response: Response):
+def kakao_login(user_info: KakaoUserInfo, response: Response):
     # 데이터베이스 세션 생성
     db: Session = SessionLocal()
     try:
@@ -112,13 +112,8 @@ async def kakao_login(user_info: KakaoUserInfo, response: Response):
         db.close()
         raise HTTPException(status_code=500, detail=f"Error processing user info: {str(e)}")
 
-
-# 카카오 연결 해제 (unlink) 메소드
-@router.delete('/api/v1/login/kakao/unregister', tags=["Unregister"])
-async def kakao_unregister(request: Request):
-    # 사용자 UUID 가져오기
-    user_uuid = request.state.user_uuid
-
+# 카카오 연결 해제 (unlink) 함수를 일반 함수로 변경
+def kakao_unregister_function(user_uuid: str):
     if not KAKAO_ADMIN_KEY:
         raise HTTPException(status_code=500, detail="KAKAO_ADMIN_KEY가 설정되지 않았습니다.")
 
@@ -160,8 +155,7 @@ async def kakao_unregister(request: Request):
         db.commit()
 
         # 토큰의 상태를 Deleted로 업데이트
-        token_entry = db.execute(select(Token).filter(Token.uuid == user_uuid))
-        token_entry = token_entry.scalars().first()
+        token_entry = db.query(Token).filter(Token.uuid == user_uuid).first()
         if token_entry:
             token_entry.status = 'Deleted'
             db.commit()
