@@ -52,11 +52,11 @@ async def kakao_login(user_info: KakaoUserInfo, response: Response):
             provider_profile_image = None if user_data['isProfileImageDefault'] else user_data['profileImage']
 
             # 사용자 존재 여부 확인
-            user = await get_user_by_provider(db, 'KAKAO', user_data['id'])
+            user = get_user_by_provider(db, 'KAKAO', user_data['id'])
 
             if not user:
                 # 새로운 유저 생성
-                user = await create_user(
+                user = create_user(
                     db,
                     email=user_data['email'],
                     provider_type='KAKAO',
@@ -78,7 +78,7 @@ async def kakao_login(user_info: KakaoUserInfo, response: Response):
                     updated_fields["provider_user_name"] = user_data['nickname']
 
                 if updated_fields:
-                    user = await update_user(db, user, **updated_fields)
+                    user = update_user(db, user, **updated_fields)
 
                 if user.status == 'Need_Register':
                     message = "Need_Register"
@@ -91,18 +91,18 @@ async def kakao_login(user_info: KakaoUserInfo, response: Response):
                     raise HTTPException(status_code=400, detail="유효하지 않은 사용자 상태입니다.")
 
             # 서버에서 JWT 토큰 생성
-            access_token = await create_access_token(uuid=user.uuid)
-            refresh_token = await create_refresh_token()
+            access_token = create_access_token(uuid=user.uuid)
+            refresh_token = create_refresh_token()
 
             # 토큰 업데이트
-            await create_or_update_token(
+            create_or_update_token(
                 db,
                 user_uuid=user.uuid,
                 provider_type='KAKAO',
                 refresh_token=refresh_token
             )
 
-            await db.close()
+            db.close()
             return {
                 "message": message,
                 "access_token": access_token,
@@ -110,7 +110,7 @@ async def kakao_login(user_info: KakaoUserInfo, response: Response):
             }
 
         except Exception as e:
-            await db.close()
+            db.close()
             raise HTTPException(status_code=500, detail=f"Error processing user info: {str(e)}")
 
 
@@ -127,7 +127,7 @@ async def kakao_unregister(request: Request):
     async with SessionLocal() as db:
         try:
             # 사용자의 provider_id 조회
-            user_result = await db.execute(select(User).filter(User.uuid == user_uuid))
+            user_result = db.execute(select(User).filter(User.uuid == user_uuid))
             user = user_result.scalars().first()
             if not user:
                 raise HTTPException(status_code=404, detail="유효하지 않은 사용자입니다.")
@@ -146,24 +146,24 @@ async def kakao_unregister(request: Request):
 
             # POST 요청으로 연결 해제
             async with httpx.AsyncClient() as client:
-                unregister_response = await client.post('https://kapi.kakao.com/v1/user/unlink', headers=headers, data=unregister_data)
+                unregister_response = client.post('https://kapi.kakao.com/v1/user/unlink', headers=headers, data=unregister_data)
             
             if unregister_response.status_code != 200:
                 raise HTTPException(status_code=unregister_response.status_code, detail="카카오 사용자 연결 해제 실패")
 
             # 사용자의 상태를 Deleted로 업데이트
             user.status = 'Deleted'
-            await db.commit()
+            db.commit()
 
             # 토큰의 상태를 Deleted로 업데이트
-            token_entry = await db.execute(select(Token).filter(Token.uuid == user_uuid))
+            token_entry = db.execute(select(Token).filter(Token.uuid == user_uuid))
             token_entry = token_entry.scalars().first()
             if token_entry:
                 token_entry.status = 'Deleted'
-                await db.commit()
+                db.commit()
 
             return {"message": "카카오 사용자 연결이 성공적으로 해제되었습니다."}
 
         except Exception as e:
-            await db.rollback()
+            db.rollback()
             raise HTTPException(status_code=500, detail=f"카카오 연결 해제 중 오류 발생: {str(e)}")

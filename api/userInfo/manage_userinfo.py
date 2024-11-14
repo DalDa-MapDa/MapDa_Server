@@ -125,7 +125,7 @@ async def inquire_user_info(request: Request):
         user_uuid = request.state.user_uuid
 
         # 사용자 정보 조회
-        user = await db.query(User).filter(User.uuid == user_uuid).first()
+        user = db.query(User).filter(User.uuid == user_uuid).first()
         if not user:
             raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
 
@@ -172,10 +172,10 @@ async def inquire_user_info(request: Request):
     except HTTPException as e:
         raise e  # 이미 발생한 HTTPException을 그대로 다시 발생시킴
     except Exception as e:
-        await db.rollback()
+        db.rollback()
         raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {str(e)}")
     finally:
-        await db.close()
+        db.close()
 
 
 @router.get("/api/v1/userinfo/check_nickname", tags=["User"])

@@ -32,13 +32,13 @@ async def google_login(data: GoogleLoginData, response: Response):
     db: Session = SessionLocal()
     try:
         # ID 토큰 검증
-        id_info = await id_token.verify_oauth2_token(
+        id_info = id_token.verify_oauth2_token(
             data.idToken, google_requests.Request(), None
         )
 
         # 클라이언트 ID 확인
         if id_info['aud'] not in GOOGLE_CLIENT_IDS:
-            await db.close()
+            db.close()
             raise HTTPException(status_code=400, detail="Invalid client ID")
 
         # 사용자 정보 추출
@@ -48,11 +48,11 @@ async def google_login(data: GoogleLoginData, response: Response):
         provider_user_name = id_info.get('name')
 
         # 사용자 존재 여부 확인
-        user = await get_user_by_provider(db, 'GOOGLE', provider_id)
+        user = get_user_by_provider(db, 'GOOGLE', provider_id)
 
         if not user:
             # 새로운 유저 생성
-            user = await create_user(
+            user = create_user(
                 db,
                 email=email,
                 provider_type='GOOGLE',
@@ -74,7 +74,7 @@ async def google_login(data: GoogleLoginData, response: Response):
                 updated_fields["provider_user_name"] = provider_user_name
 
             if updated_fields:
-                user = await update_user(db, user, **updated_fields)
+                user = update_user(db, user, **updated_fields)
 
             if user.status == 'Need_Register':
                 message = "Need_Register"
@@ -87,11 +87,11 @@ async def google_login(data: GoogleLoginData, response: Response):
                 raise HTTPException(status_code=400, detail="유효하지 않은 사용자 상태입니다.")
 
         # 서버에서 JWT 토큰 생성
-        access_token = await create_access_token(uuid=user.uuid)
-        refresh_token = await create_refresh_token()
+        access_token = create_access_token(uuid=user.uuid)
+        refresh_token = create_refresh_token()
 
         # 토큰 업데이트
-        await create_or_update_token(
+        create_or_update_token(
             db,
             user_uuid=user.uuid,
             refresh_token=refresh_token,
@@ -99,7 +99,7 @@ async def google_login(data: GoogleLoginData, response: Response):
             provider_access_token=data.accessToken
         )
 
-        await db.close()
+        db.close()
         return {
             "message": message,
             "access_token": access_token,
@@ -124,7 +124,7 @@ async def google_unregister(request: Request):
     async with SessionLocal() as db:
         try:
             # 사용자의 토큰 항목 조회
-            token_entry = await db.execute(select(Token).filter(Token.uuid == user_uuid))
+            token_entry = db.execute(select(Token).filter(Token.uuid == user_uuid))
             token_entry = token_entry.scalars().first()
             if not token_entry:
                 raise HTTPException(status_code=404, detail="유효하지 않은 사용자입니다.")
@@ -135,24 +135,24 @@ async def google_unregister(request: Request):
             # 구글에 연결 해제 요청 보내기
             async with httpx.AsyncClient() as client:
                 revoke_url = f"https://accounts.google.com/o/oauth2/revoke?token={user_access_token}"
-                revoke_response = await client.post(revoke_url)
+                revoke_response = client.post(revoke_url)
 
             if revoke_response.status_code != 200:
                 raise HTTPException(status_code=revoke_response.status_code, detail="구글 계정 연결 해제 실패")
 
             # 사용자의 상태를 Deleted로 업데이트
-            user = await db.execute(select(User).filter(User.uuid == user_uuid))
+            user = db.execute(select(User).filter(User.uuid == user_uuid))
             user = user.scalars().first()
             if user:
                 user.status = 'Deleted'
-                await db.commit()
+            db.commit()
 
             # 토큰의 상태를 Deleted로 업데이트
             token_entry.status = 'Deleted'
-            await db.commit()
+            db.commit()
 
             return {"message": "구글 계정 연결 해제 성공"}
 
         except Exception as e:
-            await db.rollback()
+            db.rollback()
             raise HTTPException(status_code=500, detail=f"구글 연결 해제 중 오류 발생: {str(e)}")
