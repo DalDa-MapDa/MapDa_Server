@@ -116,27 +116,27 @@ async def register_complete(
         db.close()
 
 
+# 유저 정보 조회
 @router.get("/api/v1/userinfo/inquire", tags=["User"])
-async def inquire_user_info(
-    request: Request,
-):
+async def inquire_user_info(request: Request):
     db: Session = SessionLocal()
     try:
         # 인증된 사용자 UUID 가져오기 (토큰 검증을 위해 미들웨어 사용)
         user_uuid = request.state.user_uuid
 
         # 사용자 정보 조회
-        user = db.query(User).filter(User.uuid == user_uuid).first()
+        user = await db.query(User).filter(User.uuid == user_uuid).first()
         if not user:
             raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
 
-        # 유저 정보 (nickname, university, profile_number, provider_profile_image) 가져오기
+        # 유저 정보 (nickname, university, profile_number, provider_profile_image, provider_type) 가져오기
         user_info = {
             "uuid": user.uuid,
             "nickname": user.nickname,
             "university": user.university,
             "profile_number": user.profile_number,
-            "provider_profile_image": user.provider_profile_image
+            "provider_profile_image": user.provider_profile_image,
+            "provider_type": user.provider_type  # provider_type 추가
         }
 
         # university 정보가 있으면 위치 정보도 개별 필드로 추가
@@ -172,10 +172,10 @@ async def inquire_user_info(
     except HTTPException as e:
         raise e  # 이미 발생한 HTTPException을 그대로 다시 발생시킴
     except Exception as e:
-        db.rollback()
+        await db.rollback()
         raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {str(e)}")
     finally:
-        db.close()
+        await db.close()
 
 
 @router.get("/api/v1/userinfo/check_nickname", tags=["User"])
