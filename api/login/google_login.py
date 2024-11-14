@@ -10,8 +10,8 @@ from api.login.login_token_manage import (
     get_user_by_provider, create_user, update_user, create_or_update_token,
     create_access_token, create_refresh_token
 )
+import requests  # 동기화된 HTTP 요청을 위해 requests 사용
 from sqlalchemy.future import select
-import httpx
 
 router = APIRouter()
 
@@ -27,7 +27,7 @@ class GoogleLoginData(BaseModel):
     accessToken: str  # access token 추가
 
 @router.post("/login/google", tags=["Login"])
-async def google_login(data: GoogleLoginData, response: Response):
+def google_login(data: GoogleLoginData, response: Response):
     # 데이터베이스 세션 생성
     db: Session = SessionLocal()
     try:
@@ -116,16 +116,15 @@ async def google_login(data: GoogleLoginData, response: Response):
 
 # 구글 계정 연결 해제 (revoke) 메소드
 @router.delete("/api/v1/login/google/unregister", tags=["Unregister"])
-async def google_unregister(request: Request):
+def google_unregister(request: Request):
     # 사용자 UUID 가져오기
     user_uuid = request.state.user_uuid
 
     # 데이터베이스 세션 생성
-    async with SessionLocal() as db:
+    with SessionLocal() as db:
         try:
             # 사용자의 토큰 항목 조회
-            token_entry = db.execute(select(Token).filter(Token.uuid == user_uuid))
-            token_entry = token_entry.scalars().first()
+            token_entry = db.query(Token).filter(Token.uuid == user_uuid).first()
             if not token_entry:
                 raise HTTPException(status_code=404, detail="유효하지 않은 사용자입니다.")
 
@@ -133,19 +132,17 @@ async def google_unregister(request: Request):
             user_access_token = token_entry.provider_access_token
 
             # 구글에 연결 해제 요청 보내기
-            async with httpx.AsyncClient() as client:
-                revoke_url = f"https://accounts.google.com/o/oauth2/revoke?token={user_access_token}"
-                revoke_response = client.post(revoke_url)
+            revoke_url = f"https://accounts.google.com/o/oauth2/revoke?token={user_access_token}"
+            revoke_response = requests.post(revoke_url)
 
             if revoke_response.status_code != 200:
                 raise HTTPException(status_code=revoke_response.status_code, detail="구글 계정 연결 해제 실패")
 
             # 사용자의 상태를 Deleted로 업데이트
-            user = db.execute(select(User).filter(User.uuid == user_uuid))
-            user = user.scalars().first()
+            user = db.query(User).filter(User.uuid == user_uuid).first()
             if user:
                 user.status = 'Deleted'
-            db.commit()
+                db.commit()
 
             # 토큰의 상태를 Deleted로 업데이트
             token_entry.status = 'Deleted'
@@ -153,6 +150,8 @@ async def google_unregister(request: Request):
 
             return {"message": "구글 계정 연결 해제 성공"}
 
+        except HTTPException as he:
+            raise he
         except Exception as e:
             db.rollback()
             raise HTTPException(status_code=500, detail=f"구글 연결 해제 중 오류 발생: {str(e)}")

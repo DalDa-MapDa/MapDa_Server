@@ -4,14 +4,13 @@ import jwt  # PyJWT 라이브러리
 import datetime
 from dotenv import load_dotenv
 import os
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
+import requests  # 동기화된 HTTP 요청을 위해 requests 사용
+from sqlalchemy.orm import Session
 from models import SessionLocal, User, Token
 from api.login.login_token_manage import (
     get_user_by_provider, create_user, create_or_update_token,
     create_access_token, create_refresh_token
 )
-import httpx  # Use httpx for async HTTP requests
 
 router = APIRouter()
 
@@ -41,22 +40,21 @@ class AppleLoginData(BaseModel):
     userName: str   # 새로운 필드 추가
 
 @router.post('/login/apple', tags=["Login"])
-async def apple_login(data: AppleLoginData, response: Response):
+def apple_login(data: AppleLoginData, response: Response):
     # 데이터베이스 세션 생성
-    async with SessionLocal() as db:
+    with SessionLocal() as db:
         try:
             # 1. 애플로부터 받은 authorizationCode로 토큰 요청
-            async with httpx.AsyncClient() as client:
-                token_response =  client.post(
-                    'https://appleid.apple.com/auth/token',
-                    data={
-                        'client_id': APPLE_CLIENT_ID,
-                        'client_secret': create_client_secret(),
-                        'code': data.authorizationCode,
-                        'grant_type': 'authorization_code',
-                        'redirect_uri': 'https://api.mapda.site/login/apple'
-                    }
-                )
+            token_response = requests.post(
+                'https://appleid.apple.com/auth/token',
+                data={
+                    'client_id': APPLE_CLIENT_ID,
+                    'client_secret': create_client_secret(),
+                    'code': data.authorizationCode,
+                    'grant_type': 'authorization_code',
+                    'redirect_uri': 'https://api.mapda.site/login/apple'
+                }
+            )
         except Exception as e:
             raise HTTPException(status_code=500, detail="애플 인증 요청 중 오류 발생")
 
@@ -77,11 +75,11 @@ async def apple_login(data: AppleLoginData, response: Response):
             raise HTTPException(status_code=400, detail="provider_id를 가져올 수 없습니다.")
 
         # 4. 사용자 존재 여부 확인
-        user =  get_user_by_provider(db, 'APPLE', provider_id)
+        user = get_user_by_provider(db, 'APPLE', provider_id)
 
         if not user:
             # 새로운 유저 생성
-            user =  create_user(
+            user = create_user(
                 db,
                 email=data.userEmail if data.userEmail else None,
                 provider_type='APPLE',
@@ -153,16 +151,15 @@ def verify_and_decode_identity_token(identity_token: str) -> dict:
 
 # 회원 탈퇴 로직
 @router.delete('/api/v1/login/apple/unregister', tags=["Unregister"])
-async def apple_unregister(request: Request):
+def apple_unregister(request: Request):
     # 액세스 토큰을 검증하고 사용자 UUID 가져오기
     user_uuid = request.state.user_uuid
 
     # 데이터베이스 세션 생성
-    async with SessionLocal() as db:
+    with SessionLocal() as db:
         try:
             # 사용자의 토큰 항목 조회
-            token_entry =  db.execute(select(Token).filter(Token.uuid == user_uuid))
-            token_entry = token_entry.scalars().first()
+            token_entry = db.query(Token).filter(Token.uuid == user_uuid).first()
             if not token_entry:
                 raise HTTPException(status_code=404, detail="유효하지 않은 사용자입니다.")
 
@@ -170,26 +167,24 @@ async def apple_unregister(request: Request):
             user_refresh_token = token_entry.provider_refresh_token
 
             # 애플에 회원 탈퇴 요청 보내기
-            async with httpx.AsyncClient() as client:
-                response =  client.post(
-                    'https://appleid.apple.com/auth/revoke',
-                    data={
-                        'client_id': APPLE_CLIENT_ID,
-                        'client_secret': create_client_secret(),
-                        'token': user_refresh_token,
-                        'token_type_hint': 'refresh_token'
-                    },
-                    headers={
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    }
-                )
+            response = requests.post(
+                'https://appleid.apple.com/auth/revoke',
+                data={
+                    'client_id': APPLE_CLIENT_ID,
+                    'client_secret': create_client_secret(),
+                    'token': user_refresh_token,
+                    'token_type_hint': 'refresh_token'
+                },
+                headers={
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            )
 
             if response.status_code != 200:
                 raise HTTPException(status_code=response.status_code, detail="애플 회원 탈퇴 실패")
 
             # 사용자의 상태를 Deleted로 업데이트
-            user =  db.execute(select(User).filter(User.uuid == user_uuid))
-            user = user.scalars().first()
+            user = db.query(User).filter(User.uuid == user_uuid).first()
             if user:
                 user.status = 'Deleted'
                 db.commit()
@@ -200,6 +195,8 @@ async def apple_unregister(request: Request):
 
             return {"message": "애플 회원 탈퇴 성공"}
 
+        except HTTPException as he:
+            raise he
         except Exception as e:
-             db.rollback()
-        raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {str(e)}")
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {str(e)}")
