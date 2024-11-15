@@ -96,46 +96,61 @@ def kakao_login(user_info: KakaoUserInfo, response: Response):
         db.close()
 
 
-@router.delete('/unregister/kakao', tags=["Login"])
+# 카카오 연결 해제 (unlink) 함수를 일반 함수로 변경
 def kakao_unregister_function(user_uuid: str):
     if not KAKAO_ADMIN_KEY:
         raise HTTPException(status_code=500, detail="KAKAO_ADMIN_KEY가 설정되지 않았습니다.")
 
+    # 데이터베이스 세션 생성
     db: Session = SessionLocal()
     try:
-        # Get user by UUID
-        user = db.execute(select(User).filter(User.uuid == user_uuid)).scalars().first()
+        # 사용자의 provider_id 조회
+        user_result = db.execute(select(User).filter(User.uuid == user_uuid))
+        user = user_result.scalars().first()
         if not user:
+            db.close()
             raise HTTPException(status_code=404, detail="유효하지 않은 사용자입니다.")
 
-        # Unlink user from Kakao
-        response = requests.post(
+        provider_id = user.provider_id
+
+        headers = {
+            "Authorization": f"KakaoAK {KAKAO_ADMIN_KEY}",
+            "Content-Type": "application/x-www-form-urlencoded"
+        }
+        
+        unregister_data = {
+            "target_id_type": "user_id",
+            "target_id": provider_id
+        }
+
+        # POST 요청으로 연결 해제
+        unregister_response = requests.post(
             'https://kapi.kakao.com/v1/user/unlink',
-            headers={
-                "Authorization": f"KakaoAK {KAKAO_ADMIN_KEY}",
-                "Content-Type": "application/x-www-form-urlencoded"
-            },
-            data={"target_id_type": "user_id", "target_id": user.provider_id}
+            headers=headers,
+            data=unregister_data
         )
 
-        if response.status_code != 200:
-            raise HTTPException(status_code=response.status_code, detail="카카오 사용자 연결 해제 실패")
+        if unregister_response.status_code != 200:
+            db.close()
+            raise HTTPException(status_code=unregister_response.status_code, detail="카카오 사용자 연결 해제 실패")
 
-        # Update user and token status to 'Deleted'
+        # 사용자의 상태를 Deleted로 업데이트
         user.status = 'Deleted'
         db.commit()
 
+        # 토큰의 상태를 Deleted로 업데이트
         token_entry = db.query(Token).filter(Token.uuid == user_uuid).first()
         if token_entry:
             token_entry.status = 'Deleted'
             db.commit()
 
+        db.close()
         return {"message": "카카오 사용자 연결이 성공적으로 해제되었습니다."}
 
-    except HTTPException:
-        raise
+    except HTTPException as he:
+        db.close()
+        raise he
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"카카오 연결 해제 중 오류 발생: {str(e)}")
-    finally:
         db.close()
+        raise HTTPException(status_code=500, detail=f"카카오 연결 해제 중 오류 발생: {str(e)}")

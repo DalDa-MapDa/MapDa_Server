@@ -147,22 +147,21 @@ def verify_and_decode_identity_token(identity_token: str) -> dict:
         return None
 
 
-@router.delete('/unregister/apple', tags=["Login"])
+# 회원 탈퇴 로직을 일반 함수로 변경
 def apple_unregister_function(user_uuid: str):
+    # 데이터베이스 세션 생성
     db: Session = SessionLocal()
     try:
-        # Retrieve user and token using get_user_by_provider
-        user = get_user_by_provider(db, 'APPLE', user_uuid)
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-
+        # 사용자의 토큰 항목 조회
         token_entry = db.query(Token).filter(Token.uuid == user_uuid).first()
         if not token_entry:
-            raise HTTPException(status_code=404, detail="Token not found")
+            db.close()
+            raise HTTPException(status_code=404, detail="유효하지 않은 사용자입니다.")
 
+        # provider_refresh_token 가져오기
         user_refresh_token = token_entry.provider_refresh_token
 
-        # Revoke token with Apple
+        # 애플에 회원 탈퇴 요청 보내기
         response = requests.post(
             'https://appleid.apple.com/auth/revoke',
             data={
@@ -171,22 +170,32 @@ def apple_unregister_function(user_uuid: str):
                 'token': user_refresh_token,
                 'token_type_hint': 'refresh_token'
             },
-            headers={'Content-Type': 'application/x-www-form-urlencoded'}
+            headers={
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
         )
 
         if response.status_code != 200:
-            raise HTTPException(status_code=response.status_code, detail="Failed to revoke Apple token")
+            db.close()
+            raise HTTPException(status_code=response.status_code, detail="애플 회원 탈퇴 실패")
 
-        # Update user and token status
-        user.status = 'Deleted'
+        # 사용자의 상태를 Deleted로 업데이트
+        user = db.query(User).filter(User.uuid == user_uuid).first()
+        if user:
+            user.status = 'Deleted'
+            db.commit()
+
+        # 토큰의 상태를 Deleted로 업데이트
         token_entry.status = 'Deleted'
         db.commit()
 
-        return {"message": "Apple account successfully unregistered"}
-    except HTTPException:
-        raise
+        db.close()
+        return {"message": "애플 회원 탈퇴 성공"}
+
+    except HTTPException as he:
+        db.close()
+        raise he
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error unregistering Apple account: {str(e)}")
-    finally:
         db.close()
+        raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {str(e)}")
