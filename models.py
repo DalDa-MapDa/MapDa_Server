@@ -33,7 +33,7 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     status = Column(Enum('Active', 'Block', 'Deleted', 'Need_Register', name='user_statuses'), default='Active', nullable=False)
-    email = Column(String(255), unique=True, nullable=True)
+    email = Column(String(255), nullable=True)
     nickname = Column(String(255), nullable=True)
     university = Column(Enum(*university_names, name='university_names'), nullable=True)
     profile_number = Column(Integer, default=1, nullable=False)
