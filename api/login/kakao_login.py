@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from typing import Optional
 from sqlalchemy.orm import Session
 from models import SessionLocal, Token, User
+from sqlalchemy.future import select as sqlalchemy_select
 from api.login.login_token_manage import (
     get_user_by_provider, create_user, update_user, create_or_update_token,
     create_access_token, create_refresh_token
@@ -105,10 +106,9 @@ def kakao_unregister_function(user_uuid: str):
     db: Session = SessionLocal()
     try:
         # 사용자의 provider_id 조회
-        user_result = db.execute(select(User).filter(User.uuid == user_uuid))
+        user_result = db.execute(sqlalchemy_select(User).filter(User.uuid == user_uuid))
         user = user_result.scalars().first()
         if not user:
-            db.close()
             raise HTTPException(status_code=404, detail="유효하지 않은 사용자입니다.")
 
         provider_id = user.provider_id
@@ -131,7 +131,6 @@ def kakao_unregister_function(user_uuid: str):
         )
 
         if unregister_response.status_code != 200:
-            db.close()
             raise HTTPException(status_code=unregister_response.status_code, detail="카카오 사용자 연결 해제 실패")
 
         # 사용자의 상태를 Deleted로 업데이트
@@ -144,13 +143,12 @@ def kakao_unregister_function(user_uuid: str):
             token_entry.status = 'Deleted'
             db.commit()
 
-        db.close()
         return {"message": "카카오 사용자 연결이 성공적으로 해제되었습니다."}
 
-    except HTTPException as he:
-        db.close()
-        raise he
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
-        db.close()
         raise HTTPException(status_code=500, detail=f"카카오 연결 해제 중 오류 발생: {str(e)}")
+    finally:
+        db.close()
