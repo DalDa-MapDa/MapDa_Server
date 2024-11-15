@@ -31,13 +31,22 @@ async def google_login(data: GoogleLoginData, response: Response):
     # 데이터베이스 세션 생성
     db: Session = SessionLocal()
     try:
+        print("google_Step 1: Received data", data)  # 요청 데이터 출력
+
         # ID 토큰 검증
-        id_info = id_token.verify_oauth2_token(
-            data.idToken, google_requests.Request(), None
-        )
+        try:
+            id_info = id_token.verify_oauth2_token(
+                data.idToken, google_requests.Request(), None
+            )
+            print("google_Step 2: ID Token verified successfully", id_info)  # 검증 결과 출력
+        except Exception as e:
+            print("google_Error verifying ID token:", e)  # 오류 메시지 출력
+            db.close()
+            raise HTTPException(status_code=400, detail="Invalid ID Token")
 
         # 클라이언트 ID 확인
         if id_info['aud'] not in GOOGLE_CLIENT_IDS:
+            print("google_Step 3: Invalid client ID. Audience:", id_info['aud'])  # 잘못된 클라이언트 ID 출력
             db.close()
             raise HTTPException(status_code=400, detail="Invalid client ID")
 
@@ -47,8 +56,16 @@ async def google_login(data: GoogleLoginData, response: Response):
         provider_profile_image = id_info.get('picture')
         provider_user_name = id_info.get('name')
 
+        print("google_Step 4: Extracted user information:", {
+            "provider_id": provider_id,
+            "email": email,
+            "provider_profile_image": provider_profile_image,
+            "provider_user_name": provider_user_name
+        })  # 사용자 정보 출력
+
         # 사용자 존재 여부 확인
         user = get_user_by_provider(db, 'GOOGLE', provider_id)
+        print("google_Step 5: User existence check:", user)  # 사용자 존재 여부 출력
 
         if not user:
             # 새로운 유저 생성
@@ -61,6 +78,7 @@ async def google_login(data: GoogleLoginData, response: Response):
                 provider_user_name=provider_user_name,
                 status='Need_Register'
             )
+            print("google_Step 6: New user created:", user)  # 생성된 사용자 정보 출력
             message = "Need_Register"
             response.status_code = 201  # 상태 코드를 201로 설정
         else:
@@ -75,6 +93,7 @@ async def google_login(data: GoogleLoginData, response: Response):
 
             if updated_fields:
                 user = update_user(db, user, **updated_fields)
+                print("google_Step 7: Updated user information:", updated_fields)  # 업데이트된 정보 출력
 
             if user.status == 'Need_Register':
                 message = "Need_Register"
@@ -83,12 +102,14 @@ async def google_login(data: GoogleLoginData, response: Response):
                 message = "로그인 성공"
                 response.status_code = 200  # 상태 코드를 200으로 설정
             else:
+                print("google_Step 8: Invalid user status:", user.status)  # 유효하지 않은 상태 출력
                 db.close()
                 raise HTTPException(status_code=400, detail="유효하지 않은 사용자 상태입니다.")
 
         # 서버에서 JWT 토큰 생성
         access_token = create_access_token(uuid=user.uuid)
         refresh_token = create_refresh_token()
+        print("google_Step 9: Tokens created. Access:", access_token, "Refresh:", refresh_token)  # 생성된 토큰 출력
 
         # 토큰 업데이트
         create_or_update_token(
@@ -98,6 +119,7 @@ async def google_login(data: GoogleLoginData, response: Response):
             provider_type='GOOGLE',
             provider_access_token=data.accessToken
         )
+        print("google_Step 10: Token updated in database")  # 토큰 업데이트 완료 메시지
 
         db.close()
         return {
@@ -106,10 +128,12 @@ async def google_login(data: GoogleLoginData, response: Response):
             "refresh_token": refresh_token
         }
 
-    except ValueError:
+    except ValueError as ve:
+        print("google_General value error:", ve)  # 일반적인 값 오류 출력
         db.close()
         raise HTTPException(status_code=400, detail="구글 인증 실패")
     except Exception as e:
+        print("google_Unexpected error occurred:", e)  # 예기치 않은 오류 출력
         db.close()
         raise HTTPException(status_code=500, detail=f"Error processing user info: {str(e)}")
 

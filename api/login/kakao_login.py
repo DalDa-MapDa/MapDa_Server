@@ -36,6 +36,8 @@ def kakao_login(user_info: KakaoUserInfo, response: Response):
     # 데이터베이스 세션 생성
     db: Session = SessionLocal()
     try:
+        print("kakao_Step 1: Received user_info", user_info)  # 요청 데이터 출력
+
         # 사용자 정보를 받아서 저장하거나 처리
         user_data = {
             "id": user_info.id,
@@ -46,12 +48,15 @@ def kakao_login(user_info: KakaoUserInfo, response: Response):
             "thumbnailImage": user_info.thumbnailImage if user_info.thumbnailImage else None,
             "connectedAt": user_info.connectedAt if user_info.connectedAt else None,
         }
+        print("kakao_Step 2: Processed user data", user_data)  # 가공된 사용자 정보 출력
 
         # provider_profile_image 설정
         provider_profile_image = None if user_data['isProfileImageDefault'] else user_data['profileImage']
+        print("kakao_Step 3: Determined provider_profile_image", provider_profile_image)  # 프로필 이미지 정보 출력
 
         # 사용자 존재 여부 확인
         user = get_user_by_provider(db, 'KAKAO', user_data['id'])
+        print("kakao_Step 4: User existence check:", user)  # 사용자 존재 여부 출력
 
         if not user:
             # 새로운 유저 생성
@@ -64,6 +69,7 @@ def kakao_login(user_info: KakaoUserInfo, response: Response):
                 provider_user_name=user_data['nickname'],
                 status='Need_Register'  # 상태를 Need_Register로 설정
             )
+            print("kakao_Step 5: New user created", user)  # 생성된 사용자 정보 출력
             message = "Need_Register"
             response.status_code = 201  # 상태 코드를 201로 설정
         else:
@@ -78,20 +84,25 @@ def kakao_login(user_info: KakaoUserInfo, response: Response):
 
             if updated_fields:
                 user = update_user(db, user, **updated_fields)
+                print("kakao_Step 6: Updated user information", updated_fields)  # 업데이트된 정보 출력
 
             if user.status == 'Need_Register':
+                print("kakao_Step 7: User in Need_Register status")  # Need_Register 상태 출력
                 message = "Need_Register"
                 response.status_code = 202  # 상태 코드를 202로 설정
             elif user.status == 'Active':
+                print("kakao_Step 8: User is Active")  # Active 상태 출력
                 message = "로그인 성공"
                 response.status_code = 200  # 상태 코드를 200으로 설정
             else:
+                print("kakao_Step 9: Invalid user status", user.status)  # 유효하지 않은 상태 출력
                 db.close()
                 raise HTTPException(status_code=400, detail="유효하지 않은 사용자 상태입니다.")
 
         # 서버에서 JWT 토큰 생성
         access_token = create_access_token(uuid=user.uuid)
         refresh_token = create_refresh_token()
+        print("kakao_Step 10: Tokens created. Access:", access_token, "Refresh:", refresh_token)  # 생성된 토큰 출력
 
         # 토큰 업데이트
         create_or_update_token(
@@ -100,6 +111,7 @@ def kakao_login(user_info: KakaoUserInfo, response: Response):
             provider_type='KAKAO',
             refresh_token=refresh_token
         )
+        print("kakao_Step 11: Token updated in database")  # 토큰 업데이트 완료 메시지
 
         db.close()
         return {
@@ -109,8 +121,13 @@ def kakao_login(user_info: KakaoUserInfo, response: Response):
         }
 
     except Exception as e:
+        print("kakao_Unexpected error occurred:", e)  # 예기치 않은 오류 출력
         db.close()
         raise HTTPException(status_code=500, detail=f"Error processing user info: {str(e)}")
+
+
+
+
 
 # 카카오 연결 해제 (unlink) 함수를 일반 함수로 변경
 def kakao_unregister_function(user_uuid: str):

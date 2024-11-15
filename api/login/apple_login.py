@@ -46,89 +46,119 @@ def apple_login(data: AppleLoginData, response: Response):
     # 데이터베이스 세션 생성
     db: Session = SessionLocal()
     try:
+        print("apple_Step 1: Received data", data)  # 요청 데이터 출력
+
         # 1. 애플로부터 받은 authorizationCode로 토큰 요청
-        token_response = requests.post(
-            'https://appleid.apple.com/auth/token',
-            data={
-                'client_id': APPLE_CLIENT_ID,
-                'client_secret': create_client_secret(),
-                'code': data.authorizationCode,
-                'grant_type': 'authorization_code',
-                'redirect_uri': 'https://api.mapda.site/login/apple'
-            }
-        )
-    except Exception as e:
-        db.close()
-        raise HTTPException(status_code=500, detail="애플 인증 요청 중 오류 발생")
+        try:
+            token_response = requests.post(
+                'https://appleid.apple.com/auth/token',
+                data={
+                    'client_id': APPLE_CLIENT_ID,
+                    'client_secret': create_client_secret(),
+                    'code': data.authorizationCode,
+                    'grant_type': 'authorization_code',
+                    'redirect_uri': 'https://api.mapda.site/login/apple'
+                }
+            )
+            print("apple_Step 2: Token response received from Apple")  # 애플의 응답 수신 확인
+        except Exception as e:
+            print("apple_Error requesting token from Apple:", e)  # 오류 메시지 출력
+            db.close()
+            raise HTTPException(status_code=500, detail="애플 인증 요청 중 오류 발생")
 
-    # 애플 인증 실패 시 오류 처리
-    if token_response.status_code != 200:
-        db.close()
-        raise HTTPException(status_code=token_response.status_code, detail="애플 인증 실패")
+        # 애플 인증 실패 시 오류 처리
+        if token_response.status_code != 200:
+            print("apple_Step 3: Apple token response error", token_response.status_code, token_response.text)  # 애플 응답 에러 출력
+            db.close()
+            raise HTTPException(status_code=token_response.status_code, detail="애플 인증 실패")
 
-    token_data = token_response.json()
+        token_data = token_response.json()
+        print("apple_Step 4: Token data from Apple", token_data)  # 토큰 데이터 출력
 
-    # 2. ID 토큰 디코딩 및 검증
-    decoded_token = verify_and_decode_identity_token(token_data.get('id_token'))
-    if decoded_token is None:
-        db.close()
-        raise HTTPException(status_code=400, detail="identityToken 검증 실패")
+        # 2. ID 토큰 디코딩 및 검증
+        decoded_token = verify_and_decode_identity_token(token_data.get('id_token'))
+        if decoded_token is None:
+            print("apple_Step 5: Identity token verification failed")  # 검증 실패 메시지 출력
+            db.close()
+            raise HTTPException(status_code=400, detail="identityToken 검증 실패")
 
-    # 3. provider_id 추출
-    provider_id = decoded_token.get('sub')
-    if not provider_id:
-        db.close()
-        raise HTTPException(status_code=400, detail="provider_id를 가져올 수 없습니다.")
+        print("apple_Step 6: Decoded identity token", decoded_token)  # 디코딩된 토큰 출력
 
-    # 4. 사용자 존재 여부 확인
-    user = get_user_by_provider(db, 'APPLE', provider_id)
+        # 3. provider_id 추출
+        provider_id = decoded_token.get('sub')
+        if not provider_id:
+            print("apple_Step 7: Provider ID not found in decoded token")  # provider_id 누락 출력
+            db.close()
+            raise HTTPException(status_code=400, detail="provider_id를 가져올 수 없습니다.")
 
-    if not user:
-        # 새로운 유저 생성
-        user = create_user(
+        print("apple_Step 8: Extracted provider_id", provider_id)  # provider_id 출력
+
+        # 4. 사용자 존재 여부 확인
+        user = get_user_by_provider(db, 'APPLE', provider_id)
+        print("apple_Step 9: User existence check:", user)  # 사용자 존재 여부 출력
+
+        if not user:
+            # 새로운 유저 생성
+            user = create_user(
+                db,
+                email=data.userEmail if data.userEmail else None,
+                provider_type='APPLE',
+                provider_id=provider_id,
+                provider_profile_image=None,
+                provider_user_name=data.userName if data.userName else None,
+                apple_real_user_status=decoded_token.get('real_user_status'),
+                status='Need_Register'  # 상태를 Need_Register로 설정
+            )
+            print("apple_Step 10: New user created", user)  # 생성된 사용자 정보 출력
+            message = "Need_Register"
+            response.status_code = 201  # 상태 코드를 201로 설정
+
+        elif user.status == 'Need_Register':
+            print("apple_Step 11: User already in Need_Register status")  # Need_Register 상태 메시지 출력
+            message = "Need_Register"
+            response.status_code = 202  # 상태 코드를 202로 설정
+
+        elif user.status == 'Active':
+            print("apple_Step 12: User is Active")  # Active 상태 메시지 출력
+            message = "로그인 성공"
+            response.status_code = 200  # 상태 코드를 200으로 설정
+
+        else:
+            print("apple_Step 13: Invalid user status", user.status)  # 유효하지 않은 상태 출력
+            db.close()
+            raise HTTPException(status_code=400, detail="유효하지 않은 사용자 상태입니다.")
+
+        # 서버에서 JWT 토큰 생성
+        access_token = create_access_token(uuid=user.uuid)
+        refresh_token = create_refresh_token()
+        print("apple_Step 14: Tokens created. Access:", access_token, "Refresh:", refresh_token)  # 생성된 토큰 출력
+
+        # 토큰 업데이트
+        create_or_update_token(
             db,
-            email=data.userEmail if data.userEmail else None,
+            user_uuid=user.uuid,
+            refresh_token=refresh_token,
             provider_type='APPLE',
-            provider_id=provider_id,
-            provider_profile_image=None,
-            provider_user_name=data.userName if data.userName else None,
-            apple_real_user_status=decoded_token.get('real_user_status'),
-            status='Need_Register'  # 상태를 Need_Register로 설정
+            provider_refresh_token=token_data.get('refresh_token')
         )
-        message = "Need_Register"
-        response.status_code = 201  # 상태 코드를 201로 설정
+        print("apple_Step 15: Token updated in database")  # 토큰 업데이트 완료 메시지
 
-    elif user.status == 'Need_Register':
-        message = "Need_Register"
-        response.status_code = 202  # 상태 코드를 202로 설정
-
-    elif user.status == 'Active':
-        message = "로그인 성공"
-        response.status_code = 200  # 상태 코드를 200으로 설정
-
-    else:
         db.close()
-        raise HTTPException(status_code=400, detail="유효하지 않은 사용자 상태입니다.")
+        return {
+            "message": message,
+            "access_token": access_token,
+            "refresh_token": refresh_token
+        }
 
-    # 서버에서 JWT 토큰 생성
-    access_token = create_access_token(uuid=user.uuid)
-    refresh_token = create_refresh_token()
+    except HTTPException as he:
+        print("apple_HTTP exception occurred:", he.detail)  # HTTP 예외 메시지 출력
+        db.close()
+        raise he
+    except Exception as e:
+        print("apple_Unexpected error occurred:", e)  # 예기치 않은 오류 출력
+        db.close()
+        raise HTTPException(status_code=500, detail=f"Error processing user info: {str(e)}")
 
-    # 토큰 업데이트
-    create_or_update_token(
-        db,
-        user_uuid=user.uuid,
-        refresh_token=refresh_token,
-        provider_type='APPLE',
-        provider_refresh_token=token_data.get('refresh_token')
-    )
-
-    db.close()
-    return {
-        "message": message,
-        "access_token": access_token,
-        "refresh_token": refresh_token
-    }
 
 # 클라이언트 시크릿 생성 함수
 def create_client_secret():
