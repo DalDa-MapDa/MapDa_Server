@@ -24,7 +24,8 @@ APPLE_CLIENT_ID = os.getenv("APPLE_CLIENT_ID")
 APPLE_KEY_ID = os.getenv("APPLE_KEY_ID")
 APPLE_TEAM_ID = os.getenv("APPLE_TEAM_ID")
 
-# AuthKey 파일에서 비밀키를 읽어오기
+# AuthKey 파일에서 비밀키를 읽어오기(이 부분은 로컬/서버 환경에 따라 경로가 다를 수 있음)
+# 삭제 금지
 auth_key_path = "/app/secrets/AuthKey_76ZFAC89DR.p8"  # 서버 경로
 # auth_key_path = "secrets/AuthKey_76ZFAC89DR.p8"  # 로컬 경로
 
@@ -41,6 +42,8 @@ class AppleLoginData(BaseModel):
     userEmail: str  # 새로운 필드 추가
     userName: str   # 새로운 필드 추가
 
+
+# 애플 로그인 메소드
 @router.post('/login/apple', tags=["Login"])
 def apple_login(data: AppleLoginData, response: Response):
     # 데이터베이스 세션 생성
@@ -94,10 +97,26 @@ def apple_login(data: AppleLoginData, response: Response):
         print("apple_Step 8: Extracted provider_id", provider_id)  # provider_id 출력
 
         # 4. 사용자 존재 여부 확인
-        user = get_user_by_provider(db, 'APPLE', provider_id)
+        user = db.query(User).filter(
+            User.provider_type == 'APPLE',
+            User.provider_id == provider_id,
+            User.status != 'Deleted'  # Deleted 상태는 제외
+        ).first()
         print("apple_Step 9: User existence check:", user)  # 사용자 존재 여부 출력
 
         if not user:
+            # Deleted 상태의 동일한 provider_id가 있을 수도 있으므로 중복 체크
+            existing_deleted_user = db.query(User).filter(
+                User.provider_type == 'APPLE',
+                User.provider_id == provider_id,
+                User.status == 'Deleted'
+            ).first()
+
+            if existing_deleted_user:
+                print("apple_Step 10: Found deleted user, creating new account")
+            else:
+                print("apple_Step 10: No user found, creating new account")
+
             # 새로운 유저 생성
             user = create_user(
                 db,
@@ -109,29 +128,29 @@ def apple_login(data: AppleLoginData, response: Response):
                 apple_real_user_status=decoded_token.get('real_user_status'),
                 status='Need_Register'  # 상태를 Need_Register로 설정
             )
-            print("apple_Step 10: New user created", user)  # 생성된 사용자 정보 출력
+            print("apple_Step 11: New user created", user)  # 생성된 사용자 정보 출력
             message = "Need_Register"
             response.status_code = 201  # 상태 코드를 201로 설정
 
         elif user.status == 'Need_Register':
-            print("apple_Step 11: User already in Need_Register status")  # Need_Register 상태 메시지 출력
+            print("apple_Step 12: User already in Need_Register status")  # Need_Register 상태 메시지 출력
             message = "Need_Register"
             response.status_code = 202  # 상태 코드를 202로 설정
 
         elif user.status == 'Active':
-            print("apple_Step 12: User is Active")  # Active 상태 메시지 출력
+            print("apple_Step 13: User is Active")  # Active 상태 메시지 출력
             message = "로그인 성공"
             response.status_code = 200  # 상태 코드를 200으로 설정
 
         else:
-            print("apple_Step 13: Invalid user status", user.status)  # 유효하지 않은 상태 출력
+            print("apple_Step 14: Invalid user status", user.status)  # 유효하지 않은 상태 출력
             db.close()
             raise HTTPException(status_code=400, detail="유효하지 않은 사용자 상태입니다.")
 
         # 서버에서 JWT 토큰 생성
         access_token = create_access_token(uuid=user.uuid)
         refresh_token = create_refresh_token()
-        print("apple_Step 14: Tokens created. Access:", access_token, "Refresh:", refresh_token)  # 생성된 토큰 출력
+        print("apple_Step 15: Tokens created. Access:", access_token, "Refresh:", refresh_token)  # 생성된 토큰 출력
 
         # 토큰 업데이트
         create_or_update_token(
@@ -141,7 +160,7 @@ def apple_login(data: AppleLoginData, response: Response):
             provider_type='APPLE',
             provider_refresh_token=token_data.get('refresh_token')
         )
-        print("apple_Step 15: Token updated in database")  # 토큰 업데이트 완료 메시지
+        print("apple_Step 16: Token updated in database")  # 토큰 업데이트 완료 메시지
 
         db.close()
         return {
@@ -158,6 +177,7 @@ def apple_login(data: AppleLoginData, response: Response):
         print("apple_Unexpected error occurred:", e)  # 예기치 않은 오류 출력
         db.close()
         raise HTTPException(status_code=500, detail=f"Error processing user info: {str(e)}")
+
 
 
 # 클라이언트 시크릿 생성 함수

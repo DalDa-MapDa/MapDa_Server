@@ -26,6 +26,8 @@ class GoogleLoginData(BaseModel):
     idToken: str
     accessToken: str  # access token 추가
 
+
+# 구글 로그인 메소드
 @router.post("/login/google", tags=["Login"])
 async def google_login(data: GoogleLoginData, response: Response):
     # 데이터베이스 세션 생성
@@ -64,10 +66,26 @@ async def google_login(data: GoogleLoginData, response: Response):
         })  # 사용자 정보 출력
 
         # 사용자 존재 여부 확인
-        user = get_user_by_provider(db, 'GOOGLE', provider_id)
+        user = db.query(User).filter(
+            User.provider_type == 'GOOGLE',
+            User.provider_id == provider_id,
+            User.status != 'Deleted'  # Deleted 상태는 제외
+        ).first()
         print("google_Step 5: User existence check:", user)  # 사용자 존재 여부 출력
 
         if not user:
+            # Deleted 상태의 동일한 provider_id가 있을 수도 있으므로 중복 체크
+            existing_deleted_user = db.query(User).filter(
+                User.provider_type == 'GOOGLE',
+                User.provider_id == provider_id,
+                User.status == 'Deleted'
+            ).first()
+
+            if existing_deleted_user:
+                print("google_Step 6: Found deleted user, creating new account")
+            else:
+                print("google_Step 6: No user found, creating new account")
+
             # 새로운 유저 생성
             user = create_user(
                 db,
@@ -78,7 +96,7 @@ async def google_login(data: GoogleLoginData, response: Response):
                 provider_user_name=provider_user_name,
                 status='Need_Register'
             )
-            print("google_Step 6: New user created:", user)  # 생성된 사용자 정보 출력
+            print("google_Step 7: New user created:", user)  # 생성된 사용자 정보 출력
             message = "Need_Register"
             response.status_code = 201  # 상태 코드를 201로 설정
         else:
@@ -93,7 +111,7 @@ async def google_login(data: GoogleLoginData, response: Response):
 
             if updated_fields:
                 user = update_user(db, user, **updated_fields)
-                print("google_Step 7: Updated user information:", updated_fields)  # 업데이트된 정보 출력
+                print("google_Step 8: Updated user information:", updated_fields)  # 업데이트된 정보 출력
 
             if user.status == 'Need_Register':
                 message = "Need_Register"
@@ -102,14 +120,14 @@ async def google_login(data: GoogleLoginData, response: Response):
                 message = "로그인 성공"
                 response.status_code = 200  # 상태 코드를 200으로 설정
             else:
-                print("google_Step 8: Invalid user status:", user.status)  # 유효하지 않은 상태 출력
+                print("google_Step 9: Invalid user status:", user.status)  # 유효하지 않은 상태 출력
                 db.close()
                 raise HTTPException(status_code=400, detail="유효하지 않은 사용자 상태입니다.")
 
         # 서버에서 JWT 토큰 생성
         access_token = create_access_token(uuid=user.uuid)
         refresh_token = create_refresh_token()
-        print("google_Step 9: Tokens created. Access:", access_token, "Refresh:", refresh_token)  # 생성된 토큰 출력
+        print("google_Step 10: Tokens created. Access:", access_token, "Refresh:", refresh_token)  # 생성된 토큰 출력
 
         # 토큰 업데이트
         create_or_update_token(
@@ -119,7 +137,7 @@ async def google_login(data: GoogleLoginData, response: Response):
             provider_type='GOOGLE',
             provider_access_token=data.accessToken
         )
-        print("google_Step 10: Token updated in database")  # 토큰 업데이트 완료 메시지
+        print("google_Step 11: Token updated in database")  # 토큰 업데이트 완료 메시지
 
         db.close()
         return {
@@ -136,6 +154,7 @@ async def google_login(data: GoogleLoginData, response: Response):
         print("google_Unexpected error occurred:", e)  # 예기치 않은 오류 출력
         db.close()
         raise HTTPException(status_code=500, detail=f"Error processing user info: {str(e)}")
+
 
 
 # 구글 계정 연결 해제 (revoke) 함수를 일반 함수로 변경

@@ -55,10 +55,26 @@ def kakao_login(user_info: KakaoUserInfo, response: Response):
         print("kakao_Step 3: Determined provider_profile_image", provider_profile_image)  # 프로필 이미지 정보 출력
 
         # 사용자 존재 여부 확인
-        user = get_user_by_provider(db, 'KAKAO', user_data['id'])
+        user = db.query(User).filter(
+            User.provider_type == 'KAKAO',
+            User.provider_id == user_data['id'],
+            User.status != 'Deleted'  # Deleted 상태는 제외
+        ).first()
         print("kakao_Step 4: User existence check:", user)  # 사용자 존재 여부 출력
 
         if not user:
+            # Deleted 상태의 동일한 provider_id가 있을 수도 있으므로 중복 체크
+            existing_deleted_user = db.query(User).filter(
+                User.provider_type == 'KAKAO',
+                User.provider_id == user_data['id'],
+                User.status == 'Deleted'
+            ).first()
+
+            if existing_deleted_user:
+                print("kakao_Step 5: Found deleted user, creating new account")
+            else:
+                print("kakao_Step 5: No user found, creating new account")
+
             # 새로운 유저 생성
             user = create_user(
                 db,
@@ -69,7 +85,7 @@ def kakao_login(user_info: KakaoUserInfo, response: Response):
                 provider_user_name=user_data['nickname'],
                 status='Need_Register'  # 상태를 Need_Register로 설정
             )
-            print("kakao_Step 5: New user created", user)  # 생성된 사용자 정보 출력
+            print("kakao_Step 6: New user created", user)  # 생성된 사용자 정보 출력
             message = "Need_Register"
             response.status_code = 201  # 상태 코드를 201로 설정
         else:
@@ -80,7 +96,7 @@ def kakao_login(user_info: KakaoUserInfo, response: Response):
             if provider_profile_image is not None:
                 updated_fields["provider_profile_image"] = provider_profile_image
             if user_data['nickname'] is not None:
-                updated_fields["provider_user_name"] = user_data['nickname']
+                updated_fields["provider_user_name"] = user_data["nickname"]
 
             if updated_fields:
                 user = update_user(db, user, **updated_fields)
@@ -124,8 +140,6 @@ def kakao_login(user_info: KakaoUserInfo, response: Response):
         print("kakao_Unexpected error occurred:", e)  # 예기치 않은 오류 출력
         db.close()
         raise HTTPException(status_code=500, detail=f"Error processing user info: {str(e)}")
-
-
 
 
 
