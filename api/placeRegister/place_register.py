@@ -27,7 +27,8 @@ router = APIRouter()
 async def register_moving_data(
     request: Request,
     placeName: str = Form(...),
-    selectedLocation: str = Form(...),
+    latitude: float = Form(...),  # 위도를 분리하여 받음
+    longitude: float = Form(...),  # 경도를 분리하여 받음
     wheeleChairAccessible: int = Form(...),
     restRoomExist: int = Form(None),
     restRoomFloor: int = Form(None),
@@ -51,14 +52,6 @@ async def register_moving_data(
         # 사용자 ID 및 대학 정보 가져오기
         user_id = user.id
         user_university = user.university  # university 데이터 가져오기
-
-        # JSON 문자열을 파싱하여 위치 정보 추출
-        try:
-            location = json.loads(selectedLocation)
-            latitude = location.get('latitude')
-            longitude = location.get('longitude')
-        except json.JSONDecodeError:
-            raise HTTPException(status_code=400, detail="잘못된 위치 정보입니다.")
 
         # 이미지를 S3에 업로드하고 URL 리스트 생성
         def upload_files(files):
@@ -88,8 +81,8 @@ async def register_moving_data(
             user_id=user_id,
             created_uuid=user_uuid,
             place_name=placeName,
-            latitude=latitude,
-            longitude=longitude,
+            latitude=latitude,  # 수정된 부분
+            longitude=longitude,  # 수정된 부분
             wheele_chair_accessible=wheeleChairAccessible,
             rest_room_exist=restRoomExist,
             rest_room_floor=restRoomFloor,
