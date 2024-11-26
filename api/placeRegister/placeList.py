@@ -30,11 +30,11 @@ async def get_place_list():
                 "created_at": place.created_at,
                 "user_id": place.user_id,
                 "created_uuid": place.created_uuid,  # 추가된 필드
-                "user_nickname": place.user.nickname if place.user else None, # 유저 닉네임(필요 시)
+                "user_nickname": user_nickname,
                 "place_name": place.place_name,
                 "latitude": place.latitude,
                 "longitude": place.longitude,
-                "wheelchair_accessible": place.wheelchair_accessible,  # 오타 수정
+                "wheelchair_accessible": place.wheele_chair_accessible,  # 오타 수정
                 "rest_room_exist": place.rest_room_exist,
                 "rest_room_floor": place.rest_room_floor,
                 "elevator_accessible": place.elevator_accessible,
