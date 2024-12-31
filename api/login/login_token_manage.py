@@ -12,7 +12,7 @@ JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')  # 직접 생성한 시크릿 키�
 JWT_ALGORITHM = 'HS256'
 
 # 액세스 토큰과 리프레시 토큰의 유효 기간 설정 (초 단위)
-ACCESS_TOKEN_EXPIRE_SECONDS = 10    # 10초
+ACCESS_TOKEN_EXPIRE_SECONDS = 3600    # 1시간
 REFRESH_TOKEN_EXPIRE_SECONDS = 604800  # 7일
 
 def get_user_by_provider(db: Session, provider_type: str, provider_id: str):

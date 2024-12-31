@@ -133,6 +133,7 @@ async def inquire_user_info(request: Request):
         user_info = {
             "uuid": user.uuid,
             "nickname": user.nickname,
+            "email": user.email,
             "university": user.university,
             "profile_number": user.profile_number,
             "provider_profile_image": user.provider_profile_image,
