@@ -34,8 +34,8 @@ async def register_moving_data(
     restRoomFloor: int = Form(None),
     elevatorAccessible: int = Form(None),
     rampAccessible: int = Form(None),
-    inDoorImage: List[UploadFile] = File(None),
-    outDoorImage: List[UploadFile] = File(None)
+    inDoorImages: List[UploadFile] = File(None),
+    outDoorImages: List[UploadFile] = File(None)
 ):
     try:
         # 인증된 사용자 UUID 가져오기
@@ -73,8 +73,8 @@ async def register_moving_data(
                 urls.append(image_url)
             return urls
 
-        in_door_image_urls = upload_files(inDoorImage) if inDoorImage else []
-        out_door_image_urls = upload_files(outDoorImage) if outDoorImage else []
+        in_door_image_urls = upload_files(inDoorImages) if inDoorImages else []
+        out_door_image_urls = upload_files(outDoorImages) if outDoorImages else []
 
         # Place 객체 생성
         db_place = Place(
