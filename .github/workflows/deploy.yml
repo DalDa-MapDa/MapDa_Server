@@ -32,6 +32,12 @@ jobs:
       run: |
         scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa -r ./* ${{ secrets.AWS_USER }}@${{ secrets.AWS_HOST }}:/home/ec2-user/MapDa_Server
 
+    - name: Install dependencies if requirements.txt changes
+      run: |
+        ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.AWS_USER }}@${{ secrets.AWS_HOST }} "if [ -f /home/ec2-user/MapDa_Server/requirements.txt ]; then 
+          cd /home/ec2-user/MapDa_Server && pip install -r requirements.txt; 
+        fi"
+
     - name: Deploy Docker Container
       run: |
         ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.AWS_USER }}@${{ secrets.AWS_HOST }} "cd /home/ec2-user/MapDa_Server && docker build -t mapda_server_image . && docker run -d -p 8000:8000 --env-file /home/ec2-user/.env --name mapda_server_container -v /home/ec2-user/secrets:/app/secrets mapda_server_image"

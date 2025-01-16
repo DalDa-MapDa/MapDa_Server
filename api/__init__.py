@@ -5,6 +5,7 @@ from api.login import kakao_login, apple_login, google_login, user_unregister
 from api.timeTable import timeTable_register, timeTable_list
 from api.tokens import token_management
 from api.userInfo import manage_userinfo
+from api.search import keyword_autocomplete
 
 # 라우터 리스트 정의
 routers = [
@@ -21,4 +22,5 @@ routers = [
     timeTable_register.router,
     timeTable_list.router,
     manage_userinfo.router,
+    keyword_autocomplete.router
 ]
