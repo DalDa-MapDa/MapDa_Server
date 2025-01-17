@@ -1,4 +1,7 @@
-version: '3.8'
+# docker-compose.yml
+# (주의) Docker Compose V2 이상에서 version은 필수가 아님. 없애도 됩니다.
+
+version: '3.8'  # 경고가 뜨면 제거해도 동작은 합니다.
 
 services:
   app:
@@ -7,22 +10,23 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
-    # -----------------------
-    # .env 파일을 자동으로 읽어오도록 설정
+    # ----------------------------------------
+    # (1) .env 파일 로드: 절대 경로 사용
     env_file:
-      - .env
-    # -----------------------
+      - /home/ec2-user/.env
+    # ----------------------------------------
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     depends_on:
       - redis
+    # ----------------------------------------
+    # (2) volumes에 secrets 폴더 절대 경로 마운트
+    #     + (기존) 현재 폴더(.)를 /app에 마운트
     volumes:
       - .:/app
-      # -----------------------
-      # secrets 폴더를 /app/secrets 에 마운트
-      - ./secrets:/app/secrets
-      # -----------------------
+      - /home/ec2-user/secrets:/app/secrets
+    # ----------------------------------------
 
   redis:
     image: redis:6.2
