@@ -35,13 +35,14 @@ jobs:
     - name: Check Redis status
       run: |
         ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.AWS_USER }}@${{ secrets.AWS_HOST }} "
-          redis6-cli <<EOF
-          PING
-          EOF
-        " > redis_output.log 2>&1
-        ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.AWS_USER }}@${{ secrets.AWS_HOST }} "bash -c \"
-          cat redis_output.log | grep PONG; then exit 1 \
-        fi "
+          echo 'PING' | redis6-cli > redis_output.log
+          if ! grep -q 'PONG' redis_output.log; then
+            echo 'Redis is not running. Deployment stopped.';
+            exit 1;
+          else
+            echo 'Redis is running.';
+          fi
+        "
 
     - name: Deploy Docker Container
       run: |
