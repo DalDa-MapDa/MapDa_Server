@@ -10,7 +10,9 @@ redis_client = redis.Redis(
     host=os.getenv('REDIS_HOST', 'localhost'),
     port=int(os.getenv('REDIS_PORT', 6379)),
     db=0,
-    decode_responses=True
+    decode_responses=True,
+    socket_connect_timeout=5,  # 연결 타임아웃
+    retry_on_timeout=True      # 타임아웃 시 재시도
 )
 
 # Redis 캐시 최대 크기 제한
