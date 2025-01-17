@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000" # 로컬 8000번 포트를 컨테이너 8000번 포트에 연결
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - redis
+    volumes:
+      - .:/app
+
+  redis:
+    image: redis:6.2 # Redis 컨테이너 이미지
+    ports:
+      - "6379:6379" # 로컬 6379번 포트를 컨테이너 6379번 포트에 연결

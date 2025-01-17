@@ -24,29 +24,23 @@ jobs:
       run: |
         ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.AWS_USER }}@${{ secrets.AWS_HOST }} "mkdir -p /home/ec2-user/MapDa_Server"
 
-    - name: Stop and remove old Docker container
+    - name: Stop and remove old Docker containers
       run: |
-        ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.AWS_USER }}@${{ secrets.AWS_HOST }} "docker stop mapda_server_container || true && docker rm mapda_server_container || true"
+        ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.AWS_USER }}@${{ secrets.AWS_HOST }} "
+          docker-compose -f /home/ec2-user/MapDa_Server/docker-compose.yml down || true
+        "
 
     - name: Copy files to EC2
       run: |
         scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa -r ./* ${{ secrets.AWS_USER }}@${{ secrets.AWS_HOST }}:/home/ec2-user/MapDa_Server
 
-    - name: Check Redis status
+    - name: Deploy with Docker Compose
       run: |
         ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.AWS_USER }}@${{ secrets.AWS_HOST }} "
-          echo 'PING' | redis6-cli > redis_output.log
-          if ! grep -q 'PONG' redis_output.log; then
-            echo 'Redis is not running. Deployment stopped.';
-            exit 1;
-          else
-            echo 'Redis is running.';
-          fi
+          cd /home/ec2-user/MapDa_Server &&
+          docker-compose down &&
+          docker-compose up --build -d
         "
-
-    - name: Deploy Docker Container
-      run: |
-        ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.AWS_USER }}@${{ secrets.AWS_HOST }} "cd /home/ec2-user/MapDa_Server && docker build -t mapda_server_image . && docker run -d -p 8000:8000 --env-file /home/ec2-user/.env --name mapda_server_container -v /home/ec2-user/secrets:/app/secrets mapda_server_image"
 
   verification:
     runs-on: ubuntu-latest
