@@ -6,7 +6,12 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8000:8000" # 로컬 8000번 포트를 컨테이너 8000번 포트에 연결
+      - "8000:8000"
+    # -----------------------
+    # .env 파일을 자동으로 읽어오도록 설정
+    env_file:
+      - .env
+    # -----------------------
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -14,8 +19,12 @@ services:
       - redis
     volumes:
       - .:/app
+      # -----------------------
+      # secrets 폴더를 /app/secrets 에 마운트
+      - ./secrets:/app/secrets
+      # -----------------------
 
   redis:
-    image: redis:6.2 # Redis 컨테이너 이미지
+    image: redis:6.2
     ports:
-      - "6379:6379" # 로컬 6379번 포트를 컨테이너 6379번 포트에 연결
+      - "6379:6379"
