@@ -20,3 +20,5 @@ REDIS_EVICTION_POLICY = os.getenv('REDIS_EVICTION_POLICY', 'allkeys-lru')  # 기
 # Redis 설정 적용
 redis_client.config_set('maxmemory', f'{MAX_CACHE_SIZE}mb')  # 메모리 제한
 redis_client.config_set('maxmemory-policy', REDIS_EVICTION_POLICY)  # 캐시 삭제 정책
+
+

@@ -32,11 +32,23 @@ jobs:
       run: |
         scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa -r ./* ${{ secrets.AWS_USER }}@${{ secrets.AWS_HOST }}:/home/ec2-user/MapDa_Server
 
-    - name: Install dependencies if requirements.txt changes
+    - name: Check and start Redis
       run: |
-        ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.AWS_USER }}@${{ secrets.AWS_HOST }} "if [ -f /home/ec2-user/MapDa_Server/requirements.txt ]; then 
-          cd /home/ec2-user/MapDa_Server && pip install -r requirements.txt; 
-        fi"
+        ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.AWS_USER }}@${{ secrets.AWS_HOST }} "
+          if ! redis-cli ping; then
+            echo 'Redis is not running. Attempting to start Redis...';
+            sudo systemctl start redis || sudo redis-server &;
+            sleep 5;
+            if ! redis-cli ping; then
+              echo 'Failed to start Redis.';
+              exit 1;
+            else
+              echo 'Redis is running.';
+            fi;
+          else
+            echo 'Redis is already running.';
+          fi
+        "
 
     - name: Deploy Docker Container
       run: |

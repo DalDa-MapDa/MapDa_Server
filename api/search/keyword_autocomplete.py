@@ -3,13 +3,18 @@ import redis
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from models import SessionLocal, Place, User
-from setting.redis_client  import redis_client  # Redis 클라이언트 가져오기
+from setting.redis_client import redis_client  # Redis 클라이언트 가져오기
 import json
 from typing import List
+from difflib import SequenceMatcher  # 문자열 유사도 계산
 
 CACHE_EXPIRATION = 3600  # 캐시 유효 시간 (1시간)
 
 router = APIRouter()
+
+def calculate_similarity(keyword: str, target: str) -> float:
+    """두 문자열 간 유사도를 계산 (0~1 사이 값 반환)."""
+    return SequenceMatcher(None, keyword.lower(), target.lower()).ratio()
 
 @router.get("/api/v1/search/place", tags=["Search"])
 async def search_places(
@@ -35,7 +40,11 @@ async def search_places(
         # 캐시된 결과 확인
         cached_result = redis_client.get(cache_key)
         if cached_result:
-            return json.loads(cached_result)
+            # 캐시된 데이터를 반환 (query와 items 포함)
+            return {
+                "query": keyword,
+                "items": json.loads(cached_result)
+            }
             
         # DB에서 검색
         places = db.query(Place.place_name)\
@@ -45,11 +54,17 @@ async def search_places(
                 func.lower(Place.place_name).contains(func.lower(keyword))
             )\
             .distinct()\
-            .limit(limit)\
             .all()
             
-        # 결과 형식화
-        result = [{"place_name": place[0]} for place in places]
+        # 유사도 기반 정렬
+        sorted_places = sorted(
+            [place[0] for place in places],  # 문자열 리스트로 변환
+            key=lambda place_name: calculate_similarity(keyword, place_name),
+            reverse=True  # 유사도가 높은 순으로 정렬
+        )
+        
+        # 결과 제한 적용
+        result = sorted_places[:limit]
         
         # 결과 캐싱
         redis_client.setex(
@@ -58,7 +73,11 @@ async def search_places(
             json.dumps(result)
         )
         
-        return result
+        # 응답 데이터 반환
+        return {
+            "query": keyword,
+            "items": result
+        }
         
     except redis.RedisError as e:
         # Redis 에러 발생 시 DB 결과만 반환
@@ -69,9 +88,16 @@ async def search_places(
                 func.lower(Place.place_name).contains(func.lower(keyword))
             )\
             .distinct()\
-            .limit(limit)\
             .all()
-        return [{"place_name": place[0]} for place in places]
+        sorted_places = sorted(
+            [place[0] for place in places],
+            key=lambda place_name: calculate_similarity(keyword, place_name),
+            reverse=True
+        )
+        return {
+            "query": keyword,
+            "items": sorted_places[:limit]
+        }
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {str(e)}")

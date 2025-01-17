@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from middleware import authentication_middleware, add_utf8_encoding
 from openapi_config import custom_openapi
 from router_config import register_routers
+from api.admin.redis_manage import flush_cache_on_startup
 
 app = FastAPI()
 
@@ -24,6 +25,9 @@ register_routers(app)
 
 # OpenAPI 스키마 커스터마이징
 app.openapi = lambda: custom_openapi(app)
+
+# 앱 시작 시 Redis 캐시 플러시
+flush_cache_on_startup()
 
 if __name__ == "__main__":
     import uvicorn
