@@ -32,21 +32,15 @@ jobs:
       run: |
         scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa -r ./* ${{ secrets.AWS_USER }}@${{ secrets.AWS_HOST }}:/home/ec2-user/MapDa_Server
 
-    - name: Check and start Redis
+    - name: Check Redis status
       run: |
         ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.AWS_USER }}@${{ secrets.AWS_HOST }} "
-          if ! redis-cli ping; then
-            echo 'Redis is not running. Attempting to start Redis...';
-            sudo systemctl start redis || sudo redis-server &;
-            sleep 5;
-            if ! redis-cli ping; then
-              echo 'Failed to start Redis.';
-              exit 1;
-            else
-              echo 'Redis is running.';
-            fi;
+          REDIS_STATUS=$(redis6-cli ping || echo 'ERROR')
+          if [ \"$REDIS_STATUS\" != 'PONG' ]; then
+            echo 'Redis is not running. Deployment stopped.';
+            exit 1;
           else
-            echo 'Redis is already running.';
+            echo 'Redis is running.';
           fi
         "
 
