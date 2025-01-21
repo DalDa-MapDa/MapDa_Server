@@ -1,18 +1,17 @@
-from datetime import datetime
-import os
-import uuid
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Request
-from pydantic import BaseModel
-from typing import List, Dict
-import boto3
 from sqlalchemy.orm import Session
-from models import SessionLocal, Place, PlaceIndoor, PlaceOutdoor, User  # User 모델 임포트
+from models import SessionLocal, PlaceMaster, PlaceContribution, PlaceContributionImage, User
+
+
+import uuid
+import os
+import boto3
+from datetime import datetime
+from typing import List
 from dotenv import load_dotenv
-import json  # json 모듈 추가
 
 load_dotenv()
 
-# S3 클라이언트 설정
 s3_client = boto3.client(
     's3',
     aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
@@ -27,8 +26,8 @@ router = APIRouter()
 async def register_moving_data(
     request: Request,
     placeName: str = Form(...),
-    latitude: float = Form(...),  # 위도를 분리하여 받음
-    longitude: float = Form(...),  # 경도를 분리하여 받음
+    latitude: float = Form(...),
+    longitude: float = Form(...),
     wheeleChairAccessible: int = Form(...),
     restRoomExist: int = Form(None),
     restRoomFloor: int = Form(None),
@@ -38,85 +37,96 @@ async def register_moving_data(
     outDoorImages: List[UploadFile] = File(None)
 ):
     try:
-        # 인증된 사용자 UUID 가져오기
         user_uuid = request.state.user_uuid
 
-        # 데이터베이스 세션 생성
         db: Session = SessionLocal()
 
-        # 사용자 정보 조회
+        # 1) 사용자 조회
         user = db.query(User).filter(User.uuid == user_uuid).first()
         if not user:
             raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
-
-        # 사용자 ID 및 대학 정보 가져오기
+        
         user_id = user.id
-        user_university = user.university  # university 데이터 가져오기
+        user_university = user.university
 
-        # 이미지를 S3에 업로드하고 URL 리스트 생성
-        def upload_files(files):
-            urls = []
-            for file in files:
-                file_extension = file.filename.split('.')[-1]
-                s3_filename = f"{uuid.uuid4()}.{file_extension}"
-                file.file.seek(0)
-                # ContentType을 설정하여 브라우저에서 바로 프리뷰 가능하도록 함
-                s3_client.upload_fileobj(
-                    file.file, 
-                    S3_BUCKET, 
-                    s3_filename,
-                    ExtraArgs={
-                        'ContentType': f'image/{file_extension}'
-                    }
-                )
-                image_url = f"https://{S3_BUCKET}.s3.{os.getenv('AWS_REGION')}.amazonaws.com/{s3_filename}"
-                urls.append(image_url)
-            return urls
+        # 2) place_master 찾기/생성
+        place_master = db.query(PlaceMaster).filter(
+            PlaceMaster.university == user_university,
+            PlaceMaster.place_name == placeName,
+            PlaceMaster.latitude == latitude,
+            PlaceMaster.longitude == longitude
+        ).first()
 
-        in_door_image_urls = upload_files(inDoorImages) if inDoorImages else []
-        out_door_image_urls = upload_files(outDoorImages) if outDoorImages else []
+        if not place_master:
+            # 없다면 새로 생성
+            place_master = PlaceMaster(
+                place_name=placeName,
+                latitude=latitude,
+                longitude=longitude,
+                university=user_university
+            )
+            db.add(place_master)
+            db.commit()
+            db.refresh(place_master)
 
-        # Place 객체 생성
-        db_place = Place(
+        # 3) place_contribution 생성
+        db_contrib = PlaceContribution(
+            place_master_id=place_master.id,
             user_id=user_id,
-            created_uuid=user_uuid,
-            place_name=placeName,
-            latitude=latitude,  # 수정된 부분
-            longitude=longitude,  # 수정된 부분
             wheele_chair_accessible=wheeleChairAccessible,
             rest_room_exist=restRoomExist,
             rest_room_floor=restRoomFloor,
             elevator_accessible=elevatorAccessible,
-            ramp_accessible=rampAccessible,
-            university=user_university  # university 데이터 저장
+            ramp_accessible=rampAccessible
         )
-        db.add(db_place)
+        db.add(db_contrib)
         db.commit()
-        db.refresh(db_place)
+        db.refresh(db_contrib)
 
-        # 이미지 URL을 place_indoor 및 place_outdoor 테이블에 저장
-        for url in in_door_image_urls:
-            db_indoor = PlaceIndoor(place_id=db_place.id, image_url=url)
-            db.add(db_indoor)
-        
-        for url in out_door_image_urls:
-            db_outdoor = PlaceOutdoor(place_id=db_place.id, image_url=url)
-            db.add(db_outdoor)
-        
+        # 4) 이미지 업로드 -> place_contribution_image 저장
+        def upload_files(files, image_type):
+            urls = []
+            for file in files:
+                ext = file.filename.split('.')[-1]
+                s3_filename = f"{uuid.uuid4()}.{ext}"
+                file.file.seek(0)
+                s3_client.upload_fileobj(
+                    file.file,
+                    S3_BUCKET,
+                    s3_filename,
+                    ExtraArgs={'ContentType': f'image/{ext}'}
+                )
+                image_url = f"https://{S3_BUCKET}.s3.{os.getenv('AWS_REGION')}.amazonaws.com/{s3_filename}"
+                # DB 저장
+                db_image = PlaceContributionImage(
+                    place_contribution_id=db_contrib.id,
+                    image_url=image_url,
+                    image_type=image_type
+                )
+                db.add(db_image)
+                urls.append(image_url)
+            return urls
+
+        # (indoor)
+        if inDoorImages:
+            upload_files(inDoorImages, "indoor")
+
+        # (outdoor)
+        if outDoorImages:
+            upload_files(outDoorImages, "outdoor")
+
         db.commit()
 
         return {
-            "id": db_place.id,
-            "resource_id": db_place.resource_id,
-            "place_name": db_place.place_name
+            "place_master_id": place_master.id,
+            "place_contribution_id": db_contrib.id,
+            "message": "등록 성공!"
         }
 
     except HTTPException as e:
-        # 이미 발생한 HTTPException은 그대로 다시 발생시킵니다.
         raise e
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {str(e)}")
-
     finally:
         db.close()

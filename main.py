@@ -4,6 +4,7 @@ from middleware import authentication_middleware, add_utf8_encoding
 from openapi_config import custom_openapi
 from router_config import register_routers
 from api.admin.redis_manage import flush_cache_on_startup
+from api.admin.admin_login import AdminTokenManager
 
 app = FastAPI()
 
@@ -28,6 +29,9 @@ app.openapi = lambda: custom_openapi(app)
 
 # 앱 시작 시 Redis 캐시 플러시
 flush_cache_on_startup()
+
+# # AdminTokenManager 초기화
+# AdminTokenManager()
 
 if __name__ == "__main__":
     import uvicorn

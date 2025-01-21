@@ -2,11 +2,11 @@ from fastapi import APIRouter, HTTPException, Request
 import redis
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from models import SessionLocal, Place, User
-from setting.redis_client import redis_client  # Redis 클라이언트 가져오기
+from models import SessionLocal, PlaceMaster, User  # 변경: Place -> PlaceMaster
+from setting.redis_client import redis_client
 import json
 from typing import List
-from difflib import SequenceMatcher  # 문자열 유사도 계산
+from difflib import SequenceMatcher
 
 CACHE_EXPIRATION = 3600  # 캐시 유효 시간 (1시간)
 
@@ -23,84 +23,81 @@ async def search_places(
     limit: int = 10
 ):
     try:
-        # 인증된 사용자 UUID 가져오기
+        # 인증된 사용자 UUID
         user_uuid = request.state.user_uuid
         
-        # DB 세션 생성
         db: Session = SessionLocal()
         
-        # 사용자의 대학교 정보 조회
+        # 사용자 조회
         user = db.query(User).filter(User.uuid == user_uuid).first()
         if not user:
             raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
-            
-        # 캐시 키 생성 (대학교_키워드 형식)
+        
+        # 캐시 키
         cache_key = f"place_search:{user.university}:{keyword}"
         
-        # 캐시된 결과 확인
+        # 캐시 확인
         cached_result = redis_client.get(cache_key)
         if cached_result:
-            # 캐시된 데이터를 반환 (query와 items 포함)
             return {
                 "query": keyword,
                 "items": json.loads(cached_result)
             }
-            
-        # DB에서 검색
-        places = db.query(Place.place_name)\
+        
+        # DB에서 검색 - PlaceMaster 사용
+        # status 컬럼이 없으므로, status=='Active' 조건 제거
+        places_query = db.query(PlaceMaster.place_name)\
             .filter(
-                Place.university == user.university,
-                Place.status == 'Active',
-                func.lower(Place.place_name).contains(func.lower(keyword))
+                PlaceMaster.university == user.university,
+                func.lower(PlaceMaster.place_name).contains(func.lower(keyword))
             )\
-            .distinct()\
-            .all()
-            
-        # 유사도 기반 정렬
+            .distinct()
+        
+        places = places_query.all()  # [(place_name,), (place_name,)...] 형태
+        
+        # 유사도 정렬
+        place_names = [p[0] for p in places]  # 실제 문자열 리스트
         sorted_places = sorted(
-            [place[0] for place in places],  # 문자열 리스트로 변환
-            key=lambda place_name: calculate_similarity(keyword, place_name),
-            reverse=True  # 유사도가 높은 순으로 정렬
+            place_names,
+            key=lambda pname: calculate_similarity(keyword, pname),
+            reverse=True
         )
         
-        # 결과 제한 적용
+        # 제한
         result = sorted_places[:limit]
         
-        # 결과 캐싱
-        redis_client.setex(
-            cache_key,
-            CACHE_EXPIRATION,
-            json.dumps(result)
-        )
+        # 캐싱
+        redis_client.setex(cache_key, CACHE_EXPIRATION, json.dumps(result))
         
-        # 응답 데이터 반환
         return {
             "query": keyword,
             "items": result
         }
-        
-    except redis.RedisError as e:
-        # Redis 에러 발생 시 DB 결과만 반환
-        places = db.query(Place.place_name)\
+    
+    except redis.RedisError:
+        # Redis 오류 시, DB 결과만
+        places_query = db.query(PlaceMaster.place_name)\
             .filter(
-                Place.university == user.university,
-                Place.status == 'Active',
-                func.lower(Place.place_name).contains(func.lower(keyword))
+                PlaceMaster.university == user.university,
+                func.lower(PlaceMaster.place_name).contains(func.lower(keyword))
             )\
-            .distinct()\
-            .all()
+            .distinct()
+        
+        places = places_query.all()
+        place_names = [p[0] for p in places]
         sorted_places = sorted(
-            [place[0] for place in places],
-            key=lambda place_name: calculate_similarity(keyword, place_name),
+            place_names,
+            key=lambda pname: calculate_similarity(keyword, pname),
             reverse=True
         )
+        
         return {
             "query": keyword,
             "items": sorted_places[:limit]
         }
-        
+    
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {str(e)}")
-        
+    
     finally:
         db.close()

@@ -7,6 +7,7 @@ from datetime import datetime
 from data.university_info import UNIVERSITY_INFO
 load_dotenv()
 
+
 # Database connection setup
 DATABASE_URL = f"mysql+pymysql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@" \
                f"{os.getenv('DB_ENDPOINT')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
@@ -46,8 +47,9 @@ class User(Base):
     # Relationships
     tokens = relationship('Token', back_populates='user')
     user_objects = relationship('UserObject', back_populates='user')
-    places = relationship('Place', back_populates='user')
     timetables = relationship('UserTimetable', back_populates='user')  # Relationship with UserTimetable
+    contributions = relationship("PlaceContribution", back_populates="user") # 장소 정보에 대해 여러 유저가 기여할 수 있도록 설정
+
 
     # UUID generation logic
     def __init__(self, *args, **kwargs):
@@ -59,6 +61,8 @@ class User(Base):
             ).scalar() + 1
             session.close()
             self.uuid = generate_uuid("U", datetime.utcnow(), seq_num)
+
+
 
 # Token model definition
 class Token(Base):
@@ -108,59 +112,59 @@ class UserObject(Base):
             session.close()
             self.resource_id = generate_uuid("UO", datetime.utcnow(), seq_num)
 
-
-# Place model definition
-class Place(Base):
-    __tablename__ = 'places_data'
+class PlaceMaster(Base):
+    __tablename__ = "place_master"
 
     id = Column(Integer, primary_key=True, index=True)
-    resource_id = Column(String(21), unique=True, nullable=False, index=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-    status = Column(Enum('Active', 'Block', 'Deleted', name='user_object_status'), default='Active', nullable=False)
-    user_id = Column(Integer, nullable=False)
-    place_name = Column(String(255), nullable=False)
+    place_name = Column(String(255), nullable=False)   # 건물명
     latitude = Column(Float, nullable=False)
     longitude = Column(Float, nullable=False)
-    wheele_chair_accessible = Column(Integer, nullable=False)
+    university = Column(Enum(*university_names, name='university_names'), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # 관계 설정
+    contributions = relationship("PlaceContribution", back_populates="place_master")
+
+
+class PlaceContribution(Base):
+    __tablename__ = "place_contribution"
+
+    id = Column(Integer, primary_key=True, index=True)
+    place_master_id = Column(Integer, ForeignKey("place_master.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    
+    # 장애물/편의시설 정보
+    wheele_chair_accessible = Column(Integer, nullable=True)  # 1 or 0
     rest_room_exist = Column(Integer, nullable=True)
     rest_room_floor = Column(Integer, nullable=True)
     elevator_accessible = Column(Integer, nullable=True)
     ramp_accessible = Column(Integer, nullable=True)
-    created_uuid = Column(String(21), ForeignKey('users.uuid'), nullable=False)
-    university = Column(Enum(*university_names, name='university_names'), nullable=True)  # 추가된 university 컬럼
 
-    # Relationships
-    indoor_images = relationship("PlaceIndoor", backref="place")
-    outdoor_images = relationship("PlaceOutdoor", backref="place")
-    user = relationship('User', back_populates='places')
+    # 상태/생성시간 등
+    status = Column(Enum('Active', 'Block', 'Deleted', name='contribution_status'),
+                    default='Active', nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if not self.resource_id:
-            session = SessionLocal()
-            seq_num = session.query(func.count(Place.id)).filter(
-                func.date(Place.created_at) == datetime.utcnow().date()
-            ).scalar() + 1
-            session.close()
-            self.resource_id = generate_uuid("PD", datetime.utcnow(), seq_num)
+    # 관계 설정
+    place_master = relationship("PlaceMaster", back_populates="contributions")
+    user = relationship("User", back_populates="contributions")
+    images = relationship("PlaceContributionImage", back_populates="contribution")
 
 
-# PlaceIndoor model definition
-class PlaceIndoor(Base):
-    __tablename__ = 'place_indoor'
+class PlaceContributionImage(Base):
+    __tablename__ = "place_contribution_image"
 
     id = Column(Integer, primary_key=True, index=True)
-    place_id = Column(Integer, ForeignKey('places_data.id'), nullable=False)
+    place_contribution_id = Column(Integer, ForeignKey("place_contribution.id"), nullable=False)
     image_url = Column(String(255), nullable=False)
+    image_type = Column(Enum('indoor', 'outdoor', name='image_types'), nullable=True)
 
-# PlaceOutdoor model definition
-class PlaceOutdoor(Base):
-    __tablename__ = 'place_outdoor'
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
-    id = Column(Integer, primary_key=True, index=True)
-    place_id = Column(Integer, ForeignKey('places_data.id'), nullable=False)
-    image_url = Column(String(255), nullable=False)
+    contribution = relationship("PlaceContribution", back_populates="images")
 
 # UserTimetable model definition
 class UserTimetable(Base):
