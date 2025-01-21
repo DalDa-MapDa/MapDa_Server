@@ -2,7 +2,6 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Request
 from sqlalchemy.orm import Session
 from models import SessionLocal, PlaceMaster, PlaceContribution, PlaceContributionImage, User
 
-
 import uuid
 import os
 import boto3
@@ -49,16 +48,15 @@ async def register_moving_data(
         user_id = user.id
         user_university = user.university
 
-        # 2) place_master 찾기/생성
+        # 2) place_master 찾기 (university + placeName)
+        #    같은 대학, 같은 이름이면 이미 존재한다고 간주
         place_master = db.query(PlaceMaster).filter(
             PlaceMaster.university == user_university,
-            PlaceMaster.place_name == placeName,
-            PlaceMaster.latitude == latitude,
-            PlaceMaster.longitude == longitude
+            PlaceMaster.place_name == placeName
         ).first()
 
+        # 같은 이름의 place_master가 없다면 새로 생성
         if not place_master:
-            # 없다면 새로 생성
             place_master = PlaceMaster(
                 place_name=placeName,
                 latitude=latitude,
