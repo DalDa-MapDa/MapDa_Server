@@ -135,7 +135,7 @@ class PlaceContribution(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     
     # 장애물/편의시설 정보
-    wheele_chair_accessible = Column(Integer, nullable=True)  # 1 or 0
+    wheele_chair_accessible = Column(Integer, nullable=True) 
     rest_room_exist = Column(Integer, nullable=True)
     rest_room_floor = Column(Integer, nullable=True)
     elevator_accessible = Column(Integer, nullable=True)
