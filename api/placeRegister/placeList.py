@@ -7,59 +7,36 @@ router = APIRouter()
 
 @router.get("/api/v1/get_place_list", tags=["Place"])
 async def get_place_list(request: Request):
+    """
+    특정 사용자가 속한 university의 place_master 목록을 최신순으로 가져온다.
+    반환 데이터: [ {id, place_name, latitude, longitude}, ... ]
+    """
     try:
         db: Session = SessionLocal()
         user_uuid = request.state.user_uuid
 
+        # 1) 사용자 조회
         user = db.query(User).filter(User.uuid == user_uuid).first()
         if not user:
             raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
 
-        # university 기준으로 필터
         user_uni = user.university
 
-        # 최신 Contribution 25개
-        contributions = db.query(PlaceContribution)\
-            .join(PlaceMaster, PlaceContribution.place_master_id == PlaceMaster.id)\
-            .options(
-                joinedload(PlaceContribution.place_master),
-                joinedload(PlaceContribution.images),
-                joinedload(PlaceContribution.user)
-            )\
+        # 2) place_master 목록 조회 (해당 유니버시티, 최신순)
+        place_masters = db.query(PlaceMaster)\
             .filter(PlaceMaster.university == user_uni)\
-            .order_by(desc(PlaceContribution.created_at))\
+            .order_by(desc(PlaceMaster.created_at))\
             .limit(25)\
             .all()
 
+        # 3) 필요한 4개 필드만 담아서 반환
         result_list = []
-        for contrib in contributions:
-            master = contrib.place_master
-            images = contrib.images
-
-            # indoor/outdoor 구분
-            indoor_urls = [img.image_url for img in images if img.image_type == 'indoor']
-            outdoor_urls = [img.image_url for img in images if img.image_type == 'outdoor']
-
+        for pm in place_masters:
             result_list.append({
-                "contribution_id": contrib.id,
-                "user_id": contrib.user_id,
-                "place_master_id": master.id,
-                "place_name": master.place_name,
-                "latitude": master.latitude,
-                "longitude": master.longitude,
-                "university": master.university,
-                # 편의시설 정보
-                "wheelchair_accessible": contrib.wheele_chair_accessible,
-                "rest_room_exist": contrib.rest_room_exist,
-                "rest_room_floor": contrib.rest_room_floor,
-                "elevator_accessible": contrib.elevator_accessible,
-                "ramp_accessible": contrib.ramp_accessible,
-                # 이미지
-                "indoor_images": indoor_urls,
-                "outdoor_images": outdoor_urls,
-                # 기타 정보
-                "created_at": contrib.created_at,
-                "user_nickname": contrib.user.nickname if contrib.user else None
+                "id": pm.id,
+                "place_name": pm.place_name,
+                "latitude": pm.latitude,
+                "longitude": pm.longitude
             })
 
         return result_list
@@ -68,6 +45,7 @@ async def get_place_list(request: Request):
         raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {str(e)}")
     finally:
         db.close()
+
 
 
 @router.get("/api/v1/get_specfic_place", tags=["Place"])
