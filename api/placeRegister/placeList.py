@@ -48,8 +48,8 @@ async def get_place_list(request: Request):
 
 
 
-@router.get("/api/v1/get_specfic_place", tags=["Place"])
-async def get_specific_place(request: Request, place_master_id: int = Query(...)):
+@router.get("/api/v1/get_specfic_place/{place_master_id}", tags=["Place"])
+async def get_specific_place(request: Request, place_master_id: int):
     """
     특정 place_master.id로 조회:
       - base_info: place_master의 기본 정보
