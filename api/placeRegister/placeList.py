@@ -94,12 +94,18 @@ async def get_specific_place(request: Request, place_master_id: int = Query(...)
 
         aggregated_data = {}
         for field_name in fields_to_aggregate:
-            value_counts = {}
+            if field_name == "wheele_chair_accessible":
+                value_counts = {str(i): 0 for i in range(1, 4)}
+            elif field_name in ["rest_room_exist", "elevator_accessible"]:
+                value_counts = {str(i): 0 for i in range(3)}
+            else:
+                value_counts = {str(i): 0 for i in range(4)}
             for contrib in contributions:
                 value = getattr(contrib, field_name, None)
                 if value is not None:
                     str_value = str(value)
-                    value_counts[str_value] = value_counts.get(str_value, 0) + 1
+                    if str_value in value_counts:
+                        value_counts[str_value] += 1
             aggregated_data[field_name] = value_counts
 
         # 4) contributor 목록 생성
