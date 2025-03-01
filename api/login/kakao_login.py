@@ -1,6 +1,6 @@
 import os
 import select
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Response, Request
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from typing import Optional
@@ -32,7 +32,18 @@ class KakaoUserInfo(BaseModel):
 
 
 @router.post('/login/kakao', tags=["Login"])
-def kakao_login(user_info: KakaoUserInfo, response: Response):
+def kakao_login(user_info: KakaoUserInfo, response: Response, request: Request):
+    # 요청 정보 출력
+    client_ip = request.client.host if request.client else 'Unknown'
+    user_agent = request.headers.get("user-agent", "Unknown")
+    print(f"요청 IP: {client_ip}")
+    print(f"요청 User-Agent: {user_agent}")
+    print(f"요청 메서드: {request.method}")
+    print(f"요청 URL: {request.url}")
+    print("요청 헤더:")
+    for header, value in request.headers.items():
+        print(f"{header}: {value}")
+
     db: Session = SessionLocal()
     try:
         # Determine profile image
