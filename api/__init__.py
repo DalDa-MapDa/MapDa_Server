@@ -7,6 +7,7 @@ from api.tokens import token_management
 from api.userInfo import manage_userinfo
 from api.search import keyword_autocomplete
 from api.admin import redis_manage
+from api.promotion import meta_ua_analysis
 
 
 # 라우터 리스트 정의
@@ -25,5 +26,6 @@ routers = [
     timeTable_list.router,
     manage_userinfo.router,
     keyword_autocomplete.router,
-    redis_manage.router
+    redis_manage.router,
+    meta_ua_analysis.router
 ]

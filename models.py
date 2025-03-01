@@ -1,12 +1,12 @@
-from sqlalchemy import Time, create_engine, Column, Integer, String, Float, DateTime, Date, Enum, ForeignKey, func
+from sqlalchemy import Time, create_engine, Column, Integer, String, Float, DateTime, Date, Enum, ForeignKey, func, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from dotenv import load_dotenv
 import os
 from datetime import datetime
 from data.university_info import UNIVERSITY_INFO
-load_dotenv()
 
+load_dotenv()
 
 # Database connection setup
 DATABASE_URL = f"mysql+pymysql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@" \
@@ -48,8 +48,7 @@ class User(Base):
     tokens = relationship('Token', back_populates='user')
     user_objects = relationship('UserObject', back_populates='user')
     timetables = relationship('UserTimetable', back_populates='user')  # Relationship with UserTimetable
-    contributions = relationship("PlaceContribution", back_populates="user") # 장소 정보에 대해 여러 유저가 기여할 수 있도록 설정
-
+    contributions = relationship("PlaceContribution", back_populates="user")  # 장소 정보에 대해 여러 유저가 기여할 수 있도록 설정
 
     # UUID generation logic
     def __init__(self, *args, **kwargs):
@@ -61,8 +60,6 @@ class User(Base):
             ).scalar() + 1
             session.close()
             self.uuid = generate_uuid("U", datetime.utcnow(), seq_num)
-
-
 
 # Token model definition
 class Token(Base):
@@ -97,7 +94,7 @@ class UserObject(Base):
     place_name = Column(String(255), nullable=False)
     image_url = Column(String(255), nullable=False)
     created_uuid = Column(String(21), ForeignKey('users.uuid'), nullable=False)
-    university = Column(Enum(*university_names, name='university_names'), nullable=True)  # 추가된 university 컬럼
+    university = Column(Enum(*university_names, name='university_names'), nullable=True)
 
     # Relationship
     user = relationship('User', back_populates='user_objects')
@@ -112,6 +109,7 @@ class UserObject(Base):
             session.close()
             self.resource_id = generate_uuid("UO", datetime.utcnow(), seq_num)
 
+# PlaceMaster model definition
 class PlaceMaster(Base):
     __tablename__ = "place_master"
 
@@ -126,7 +124,7 @@ class PlaceMaster(Base):
     # 관계 설정
     contributions = relationship("PlaceContribution", back_populates="place_master")
 
-
+# PlaceContribution model definition
 class PlaceContribution(Base):
     __tablename__ = "place_contribution"
 
@@ -152,7 +150,7 @@ class PlaceContribution(Base):
     user = relationship("User", back_populates="contributions")
     images = relationship("PlaceContributionImage", back_populates="contribution")
 
-
+# PlaceContributionImage model definition
 class PlaceContributionImage(Base):
     __tablename__ = "place_contribution_image"
 
@@ -164,6 +162,7 @@ class PlaceContributionImage(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
+    # 관계 설정
     contribution = relationship("PlaceContribution", back_populates="images")
 
 # UserTimetable model definition
@@ -183,6 +182,19 @@ class UserTimetable(Base):
 
     # Relationship
     user = relationship('User', back_populates='timetables')
+
+# Campaign model definition (campaign_table)
+class Campaign(Base):
+    __tablename__ = "campaign_table"
+
+    id = Column(Integer, primary_key=True, index=True)
+    utm_source = Column(String(255), nullable=True)
+    utm_medium = Column(String(255), nullable=True)
+    utm_campaign = Column(String(255), nullable=True)
+    utm_content = Column(String(255), nullable=True)
+    x_real_ip = Column(String(50), nullable=True)
+    match = Column(Boolean, default=False, nullable=False)  # 기본값 False
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 # Create all tables in the database
 Base.metadata.create_all(bind=engine)
