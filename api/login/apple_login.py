@@ -24,8 +24,8 @@ APPLE_TEAM_ID = os.getenv("APPLE_TEAM_ID")
 
 # AuthKey 파일에서 비밀키를 읽어오기(이 부분은 로컬/서버 환경에 따라 경로가 다를 수 있음)
 # 삭제 금지
-# auth_key_path = "/app/secrets/AuthKey_76ZFAC89DR.p8"  # 서버 경로
-auth_key_path = "secrets/AuthKey_76ZFAC89DR.p8"  # 로컬 경로
+auth_key_path = "/app/secrets/AuthKey_76ZFAC89DR.p8"  # 서버 경로
+# auth_key_path = "secrets/AuthKey_76ZFAC89DR.p8"  # 로컬 경로
 
 
 try:
