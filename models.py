@@ -193,8 +193,13 @@ class Campaign(Base):
     utm_campaign = Column(String(255), nullable=True)
     utm_content = Column(String(255), nullable=True)
     x_real_ip = Column(String(50), nullable=True)
-    match = Column(Boolean, default=False, nullable=False)  # 기본값 False
+    status = Column(Enum('Converted', 'APP_OPEN', 'MATCH', name='campaign_status'), default='Converted', nullable=False) # status는 'Converted', 'APP_OPEN', 'MATCH' 중 하나 (기본값: Converted)
+    match_UUID = Column(String(255), nullable=True) # 나중에 MATCH 상태가 될 때 어떤 유저와 연결되었는지 확인하기 위한 컬럼
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+# Create all tables in the database
+Base.metadata.create_all(bind=engine)
+
 
 # Create all tables in the database
 Base.metadata.create_all(bind=engine)
