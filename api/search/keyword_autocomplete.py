@@ -128,8 +128,9 @@ async def search_places_coordinates(
                 "items": json.loads(cached)
             }
 
-        # 4) DB에서 place_name, latitude, longitude 함께 조회
+        # 4) DB에서 id, place_name, latitude, longitude 함께 조회
         records = db.query(
+            PlaceMaster.id,
             PlaceMaster.place_name,
             PlaceMaster.latitude,
             PlaceMaster.longitude
@@ -138,17 +139,22 @@ async def search_places_coordinates(
             func.lower(PlaceMaster.place_name).contains(func.lower(keyword))
         ).distinct().all()
 
-        # 5) 유사도 계산 후 정렬
+        # 5) 유사도 계산 후 정렬 (name이 튜플의 두 번째 요소이므로 x[1] 사용)
         sorted_records = sorted(
             records,
-            key=lambda x: calculate_similarity(keyword, x[0]),
+            key=lambda x: calculate_similarity(keyword, x[1]),
             reverse=True
         )[:limit]
 
-        # 6) dict 형태로 가공
+        # 6) dict 형태로 가공 (id 포함)
         items = [
-            {"place_name": name, "latitude": lat, "longitude": lon}
-            for name, lat, lon in sorted_records
+            {
+                "id": pid,
+                "place_name": name,
+                "latitude": lat,
+                "longitude": lon
+            }
+            for pid, name, lat, lon in sorted_records
         ]
 
         # 7) 캐싱
@@ -159,6 +165,7 @@ async def search_places_coordinates(
     except redis.RedisError:
         # Redis 오류 발생 시 DB 결과만 반환
         records = db.query(
+            PlaceMaster.id,
             PlaceMaster.place_name,
             PlaceMaster.latitude,
             PlaceMaster.longitude
@@ -169,13 +176,18 @@ async def search_places_coordinates(
 
         sorted_records = sorted(
             records,
-            key=lambda x: calculate_similarity(keyword, x[0]),
+            key=lambda x: calculate_similarity(keyword, x[1]),
             reverse=True
         )[:limit]
 
         items = [
-            {"place_name": name, "latitude": lat, "longitude": lon}
-            for name, lat, lon in sorted_records
+            {
+                "id": pid,
+                "place_name": name,
+                "latitude": lat,
+                "longitude": lon
+            }
+            for pid, name, lat, lon in sorted_records
         ]
         return {"query": keyword, "items": items}
 
