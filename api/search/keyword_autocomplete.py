@@ -101,3 +101,86 @@ async def search_places(
     
     finally:
         db.close()
+
+
+@router.get("/api/v1/search/place/coordinates", tags=["Search"])
+async def search_places_coordinates(
+    request: Request,
+    keyword: str,
+    limit: int = 10
+):
+    try:
+        # 1) 인증된 사용자 UUID
+        user_uuid = request.state.user_uuid
+        db: Session = SessionLocal()
+
+        # 2) 사용자 조회
+        user = db.query(User).filter(User.uuid == user_uuid).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+
+        # 3) 캐시 키
+        cache_key = f"place_search_coords:{user.university}:{keyword}"
+        cached = redis_client.get(cache_key)
+        if cached:
+            return {
+                "query": keyword,
+                "items": json.loads(cached)
+            }
+
+        # 4) DB에서 place_name, latitude, longitude 함께 조회
+        records = db.query(
+            PlaceMaster.place_name,
+            PlaceMaster.latitude,
+            PlaceMaster.longitude
+        ).filter(
+            PlaceMaster.university == user.university,
+            func.lower(PlaceMaster.place_name).contains(func.lower(keyword))
+        ).distinct().all()
+
+        # 5) 유사도 계산 후 정렬
+        sorted_records = sorted(
+            records,
+            key=lambda x: calculate_similarity(keyword, x[0]),
+            reverse=True
+        )[:limit]
+
+        # 6) dict 형태로 가공
+        items = [
+            {"place_name": name, "latitude": lat, "longitude": lon}
+            for name, lat, lon in sorted_records
+        ]
+
+        # 7) 캐싱
+        redis_client.setex(cache_key, CACHE_EXPIRATION, json.dumps(items))
+
+        return {"query": keyword, "items": items}
+
+    except redis.RedisError:
+        # Redis 오류 발생 시 DB 결과만 반환
+        records = db.query(
+            PlaceMaster.place_name,
+            PlaceMaster.latitude,
+            PlaceMaster.longitude
+        ).filter(
+            PlaceMaster.university == user.university,
+            func.lower(PlaceMaster.place_name).contains(func.lower(keyword))
+        ).distinct().all()
+
+        sorted_records = sorted(
+            records,
+            key=lambda x: calculate_similarity(keyword, x[0]),
+            reverse=True
+        )[:limit]
+
+        items = [
+            {"place_name": name, "latitude": lat, "longitude": lon}
+            for name, lat, lon in sorted_records
+        ]
+        return {"query": keyword, "items": items}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {e}")
+
+    finally:
+        db.close()
