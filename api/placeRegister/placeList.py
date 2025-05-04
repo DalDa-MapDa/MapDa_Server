@@ -1,51 +1,84 @@
+from datetime import datetime
+import random
 from fastapi import APIRouter, HTTPException, Query, Request
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import desc
+from sqlalchemy import desc, func
 from models import SessionLocal, PlaceContribution, PlaceMaster, PlaceContributionImage, User
 
 router = APIRouter()
+
+# 최대 몇 개의 장소를 visible=True 로 표시할지 설정
+MAX_VISIBLE = 4
 
 @router.get("/api/v1/get_place_list", tags=["Place"])
 async def get_place_list(request: Request):
     """
     특정 사용자가 속한 university의 place_master 목록을 최신순으로 가져온다.
-    반환 데이터: [ {id, place_name, latitude, longitude}, ... ]
+    반환 데이터: [
+      {
+        id,
+        place_name,
+        latitude,
+        longitude,
+        contributor_count,   # 기여자 수
+        display             # 화면에 보여줄지 여부 (True/False)
+      },
+      ...
+    ]
     """
+    db: Session = SessionLocal()
     try:
-        db: Session = SessionLocal()
-        user_uuid = request.state.user_uuid
-
         # 1) 사용자 조회
+        user_uuid = request.state.user_uuid
         user = db.query(User).filter(User.uuid == user_uuid).first()
         if not user:
             raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
-
         user_uni = user.university
 
-        # 2) place_master 목록 조회 (해당 유니버시티, 최신순)
-        place_masters = db.query(PlaceMaster)\
-            .filter(PlaceMaster.university == user_uni)\
-            .order_by(desc(PlaceMaster.created_at))\
-            .limit(25)\
-            .all()
+        # 2) place_master + contributor_count 조회
+        query = (
+            db.query(
+                PlaceMaster,
+                func.count(PlaceContribution.id).label("contributor_count")
+            )
+            .outerjoin(
+                PlaceContribution,
+                PlaceContribution.place_master_id == PlaceMaster.id
+            )
+            .filter(PlaceMaster.university == user_uni)
+            .group_by(PlaceMaster.id)
+            .order_by(desc(PlaceMaster.created_at))
+            .limit(25)
+        )
+        results = query.all()
 
-        # 3) 필요한 4개 필드만 담아서 반환
-        result_list = []
-        for pm in place_masters:
-            result_list.append({
+        # 3) dict 형태로 변환
+        items = []
+        for pm, contrib_count in results:
+            items.append({
                 "id": pm.id,
                 "place_name": pm.place_name,
                 "latitude": pm.latitude,
-                "longitude": pm.longitude
+                "longitude": pm.longitude,
+                "contributor_count": contrib_count,
             })
 
-        return result_list
+        # 4) 현재 시간(hour) 기반으로 seed 설정 후 섞기
+        now = datetime.now()
+        rng = random.Random(now.hour)
+        rng.shuffle(items)
+
+        # 5) 앞에서부터 MAX_VISIBLE 개수만 display=True, 나머지 False
+        for idx, item in enumerate(items):
+            item["display"] = idx < MAX_VISIBLE
+
+        return items
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {e}")
+
     finally:
         db.close()
-
 
 
 @router.get("/api/v1/get_specfic_place/{place_master_id}", tags=["Place"])
