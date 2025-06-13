@@ -9,6 +9,7 @@ from api.search import keyword_autocomplete
 from api.admin import redis_manage
 from api.promotion import meta_ua_analysis
 from api.activity import user_barrierfree_activity
+from api.message import send_message, check_message
 
 
 # 라우터 리스트 정의
@@ -29,5 +30,7 @@ routers = [
     keyword_autocomplete.router,
     redis_manage.router,
     meta_ua_analysis.router,
-    user_barrierfree_activity.router
+    user_barrierfree_activity.router,
+    send_message.router,
+    check_message.router
 ]

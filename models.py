@@ -197,9 +197,30 @@ class Campaign(Base):
     match_UUID = Column(String(255), nullable=True) # 나중에 MATCH 상태가 될 때 어떤 유저와 연결되었는지 확인하기 위한 컬럼
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
-# Create all tables in the database
-Base.metadata.create_all(bind=engine)
 
+class Message(Base):
+    __tablename__ = 'messages'
 
+    id = Column(Integer, primary_key=True, index=True)
+    sender_uuid = Column(String(21), ForeignKey('users.uuid'), nullable=False)
+    recipient_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    danger_obj_id = Column(Integer, nullable=False)
+
+    # 1~6번 메시지 타입을 boolean으로 저장
+    message_type_1 = Column(Boolean, default=False, nullable=False)
+    message_type_2 = Column(Boolean, default=False, nullable=False)
+    message_type_3 = Column(Boolean, default=False, nullable=False)
+    message_type_4 = Column(Boolean, default=False, nullable=False)
+    message_type_5 = Column(Boolean, default=False, nullable=False)
+    message_type_6 = Column(Boolean, default=False, nullable=False)
+
+    is_read = Column(Boolean, default=False, nullable=False)
+    read_at = Column(DateTime, nullable=True)
+    
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # User와의 관계 설정 (보낸 사람, 받는 사람)
+    sender = relationship('User', foreign_keys=[sender_uuid])
+    recipient = relationship('User', foreign_keys=[recipient_id])
 # Create all tables in the database
 Base.metadata.create_all(bind=engine)
