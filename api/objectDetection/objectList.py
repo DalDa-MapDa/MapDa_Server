@@ -51,7 +51,11 @@ async def get_object_list(request: Request):
         db.close()
 
 @router.get("/api/v1/get_specific_object/{id}", tags=["Object"])
-async def get_specific_object(id: int):
+async def get_specific_object(id: int, request: Request):
+    """
+    특정 ID의 객체 정보를 조회합니다.
+    요청을 보낸 사용자가 객체의 소유주인지 여부를 'is_mine' 필드에 담아 반환합니다.
+    """
     try:
         # DB 세션 생성
         db: Session = SessionLocal()
@@ -62,7 +66,13 @@ async def get_specific_object(id: int):
         if obj is None:
             raise HTTPException(status_code=404, detail="객체를 찾을 수 없습니다.")
 
-        # 객체 반환
+        # 미들웨어를 통해 전달된 현재 사용자의 UUID를 가져옵니다.
+        current_user_uuid = request.state.user_uuid
+
+        # 객체를 생성한 사용자의 UUID와 현재 요청을 보낸 사용자의 UUID를 비교합니다.
+        is_mine_value = (obj.created_uuid == current_user_uuid)
+
+        # 객체 정보와 함께 is_mine 값을 반환합니다.
         return {
             "id": obj.id,
             "resource_id": obj.resource_id,
@@ -73,7 +83,8 @@ async def get_specific_object(id: int):
             "longitude": obj.longitude,
             "object_name": obj.object_name,
             "place_name": obj.place_name,
-            "image_url": obj.image_url
+            "image_url": obj.image_url,
+            "is_mine": is_mine_value
         }
 
     except Exception as e:

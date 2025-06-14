@@ -26,7 +26,7 @@ class MessageDetailsResponse(BaseModel):
     created_at: datetime
 
     class Config:
-        orm_mode = True # SQLAlchemy 모델을 Pydantic 모델로 변환 허용
+        from_attributes = True # SQLAlchemy 모델을 Pydantic 모델로 변환 허용
 
 # API의 최종 응답 구조를 정의합니다.
 class CheckMessageResponse(BaseModel):
