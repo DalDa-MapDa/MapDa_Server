@@ -1,14 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, func, case # [추가] func, case 임포트
+from sqlalchemy import desc, func, case
 from models import SessionLocal, User, Message
 from typing import Optional, List
 from datetime import datetime
 
 router = APIRouter()
 
-# --- 기존 Pydantic 응답 모델들 ---
+# --- Pydantic 응답 모델 정의 ---
 class MessageDetailsResponse(BaseModel):
     id: int
     sender_uuid: str
@@ -31,7 +31,6 @@ class CheckMessageResponse(BaseModel):
     has_new_message: bool
     message: Optional[MessageDetailsResponse] = None
 
-# --- [신규] check_my_mail을 위한 Pydantic 응답 모델 ---
 class AllMessagesCountResponse(BaseModel):
     message_type_1: int
     message_type_2: int
@@ -60,11 +59,7 @@ async def check_for_new_message(
     request: Request,
     db: Session = Depends(get_db)
 ):
-    """
-    현재 로그인한 사용자를 수신자로 하는 읽지 않은(is_read=False) 메시지가 있는지 확인합니다.
-    - 읽지 않은 메시지가 있으면, 가장 최신 메시지 1개의 정보와 함께 `has_new_message: true`를 반환합니다.
-    - 읽지 않은 메시지가 없으면, `has_new_message: false`를 반환합니다.
-    """
+    # (기존 코드와 동일)
     try:
         user_uuid = request.state.user_uuid
         current_user = db.query(User).filter(User.uuid == user_uuid).first()
@@ -91,7 +86,6 @@ async def check_for_new_message(
         raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {str(e)}")
 
 
-# --- [신규] 추가된 API 엔드포인트 ---
 @router.get(
     "/api/v1/message/all",
     response_model=AllMessagesCountResponse,
@@ -102,16 +96,9 @@ async def check_my_mail(
     request: Request,
     db: Session = Depends(get_db)
 ):
-    """
-    현재 로그인한 사용자가 수신한 모든 메시지에 대해,
-    message_type 1부터 6까지 각각 몇 개인지 집계하여 반환합니다.
-    """
+    # (기존 코드와 동일)
     try:
-        # 1. 현재 사용자 UUID 확인
         user_uuid = request.state.user_uuid
-
-        # 2. SQLAlchemy의 func.sum과 case를 사용하여 DB에서 직접 개수 집계
-        # 이 방법은 모든 메시지를 서버 메모리로 가져와서 루프를 돌리는 것보다 훨씬 효율적입니다.
         counts = db.query(
             func.sum(case((Message.message_type_1 == True, 1), else_=0)).label("count_1"),
             func.sum(case((Message.message_type_2 == True, 1), else_=0)).label("count_2"),
@@ -121,7 +108,6 @@ async def check_my_mail(
             func.sum(case((Message.message_type_6 == True, 1), else_=0)).label("count_6")
         ).filter(Message.recipient_uuid == user_uuid).one()
 
-        # 3. 쿼리 결과를 Pydantic 모델에 맞춰 반환
         return AllMessagesCountResponse(
             message_type_1=counts.count_1 or 0,
             message_type_2=counts.count_2 or 0,
@@ -130,6 +116,46 @@ async def check_my_mail(
             message_type_5=counts.count_5 or 0,
             message_type_6=counts.count_6 or 0
         )
-        
     except Exception as e:
+        raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {str(e)}")
+
+
+# --- [신규] 추가된 API 엔드포인트 ---
+@router.get(
+    "/api/v1/message/confirm",
+    tags=["Message"],
+    summary="수신한 모든 메시지를 읽음 처리"
+)
+async def confirm_all_messages(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    현재 로그인한 사용자가 받은 모든 '읽지 않은' 메시지를 '읽음' 상태로 변경하고,
+    읽은 시간을 현재 시간으로 기록합니다.
+    """
+    try:
+        user_uuid = request.state.user_uuid
+        
+        # 1. 업데이트할 대상 쿼리
+        # 이미 읽은 메시지는 제외하여 불필요한 DB 쓰기를 방지합니다.
+        messages_to_update = db.query(Message).filter(
+            Message.recipient_uuid == user_uuid,
+            Message.is_read == False
+        )
+        
+        # 2. 대량 업데이트(bulk update) 실행
+        # 이 방법은 메시지를 하나씩 불러와 수정하는 것보다 훨씬 효율적입니다.
+        updated_count = messages_to_update.update({
+            "is_read": True,
+            "read_at": datetime.utcnow()
+        }, synchronize_session=False) # 세션 동기화 전략 설정
+        
+        # 3. 변경사항 커밋
+        db.commit()
+        
+        return {"status": "success", "updated_count": updated_count}
+
+    except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {str(e)}")
