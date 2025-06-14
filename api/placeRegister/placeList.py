@@ -1,9 +1,11 @@
 from datetime import datetime
 import random
 from fastapi import APIRouter, HTTPException, Query, Request
+from pydantic import BaseModel, Field # Pydantic 모델을 위해 추가
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import desc, func
+from sqlalchemy import desc, func, distinct # distinct를 위해 추가
 from models import SessionLocal, PlaceContribution, PlaceMaster, PlaceContributionImage, User
+from typing import List, Optional # Pydantic 모델을 위해 추가
 
 router = APIRouter()
 
@@ -182,5 +184,79 @@ async def get_specific_place(request: Request, place_master_id: int):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {str(e)}")
+    finally:
+        db.close()
+
+
+class UserPlaceResponseItem(BaseModel):
+    place_id: int
+    place_name: str
+    contributor_count: int
+    image_url: Optional[str] = None
+
+# --- [신규] 추가된 API 엔드포인트 ---
+@router.get(
+    "/api/v1/user_place_list",
+    response_model=List[UserPlaceResponseItem],
+    tags=["Place"],
+    summary="사용자가 기여한 장소 목록 조회"
+)
+async def user_place_list(request: Request):
+    """
+    현재 로그인한 사용자가 정보를 기여한 장소들의 목록을 반환합니다.
+    """
+    db: Session = SessionLocal()
+    try:
+        # 1. 현재 사용자 ID 조회
+        user_uuid = request.state.user_uuid
+        user = db.query(User.id).filter(User.uuid == user_uuid).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+        user_id = user.id
+
+        # 2. 사용자가 기여한 모든 장소의 고유 ID (place_master_id) 목록 조회
+        place_ids_query = db.query(distinct(PlaceContribution.place_master_id)).filter(PlaceContribution.user_id == user_id)
+        place_ids = [pid for pid, in place_ids_query.all()]
+
+        if not place_ids:
+            return [] # 기여한 장소가 없으면 빈 리스트 반환
+
+        # 3. 각 장소별 기여자 수(중복제거)를 계산하는 서브쿼리 생성
+        contributor_count_subquery = (
+            db.query(func.count(distinct(PlaceContribution.user_id)))
+            .filter(PlaceContribution.place_master_id == PlaceMaster.id)
+            .correlate(PlaceMaster) # 메인 쿼리의 PlaceMaster와 연결
+            .as_scalar()
+        )
+
+        # 4. 각 장소별 가장 최신 이미지 URL을 가져오는 서브쿼리 생성
+        image_url_subquery = (
+            db.query(PlaceContributionImage.image_url)
+            .join(PlaceContribution, PlaceContributionImage.place_contribution_id == PlaceContribution.id)
+            .filter(PlaceContribution.place_master_id == PlaceMaster.id)
+            .order_by(PlaceContributionImage.created_at.desc())
+            .limit(1)
+            .correlate(PlaceMaster)
+            .as_scalar()
+        )
+
+        # 5. 메인 쿼리: 위에서 얻은 장소 ID 목록과 서브쿼리들을 사용하여 최종 데이터 조회
+        results = (
+            db.query(
+                PlaceMaster.id.label("place_id"),
+                PlaceMaster.place_name,
+                contributor_count_subquery.label("contributor_count"),
+                image_url_subquery.label("image_url")
+            )
+            .filter(PlaceMaster.id.in_(place_ids))
+            .order_by(desc(PlaceMaster.created_at)) # 장소의 최신 등록 순으로 정렬
+            .all()
+        )
+
+        return results
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {e}")
     finally:
         db.close()
