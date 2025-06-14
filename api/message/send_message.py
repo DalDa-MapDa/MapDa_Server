@@ -8,7 +8,8 @@ router = APIRouter()
 
 # --- Pydantic 모델 정의 ---
 class MessageCreate(BaseModel):
-    recipient_id: int = Field(..., description="메시지를 받을 사용자의 ID")
+    # [변경점] 필드명을 recipient_uuid로 변경하여 명확성을 높입니다.
+    recipient_uuid: str = Field(..., description="메시지를 받을 사용자의 UUID")
     message_types: List[int] = Field(..., description="메시지 종류 리스트 (1부터 6까지의 정수 배열)")
     danger_obj_id: Optional[int] = Field(None, description="연관된 위험 객체의 ID (정수, 선택 사항)")
 
@@ -30,27 +31,29 @@ async def send_user_message(
     """
     인증된 사용자가 다른 사용자에게 1~6번 타입의 메시지를 보냅니다.
 
-    - **recipient_id**: 메시지를 받을 사용자의 고유 ID (int)
+    - **recipient_uuid**: 메시지를 받을 사용자의 고유 UUID (string)
     - **message_types**: 보낼 메시지의 종류가 담긴 리스트 (예: [1, 3, 5])
     - **danger_obj_id**: 연관된 위험 객체의 ID (정수, 선택 사항)
     """
-    # (API 로직 자체는 이전과 동일하게 작동합니다. 타입 힌트만 변경되었습니다.)
     try:
         sender_uuid = request.state.user_uuid
         sender = db.query(User).filter(User.uuid == sender_uuid).first()
         if not sender:
             raise HTTPException(status_code=404, detail="메시지를 보내는 사용자를 찾을 수 없습니다.")
 
-        recipient = db.query(User).filter(User.id == payload.recipient_id).first()
+        # [변경점] 수신자를 id가 아닌 uuid로 조회합니다.
+        recipient = db.query(User).filter(User.uuid == payload.recipient_uuid).first()
         if not recipient:
             raise HTTPException(status_code=404, detail="메시지를 받는 사용자를 찾을 수 없습니다.")
         
-        if sender.id == recipient.id:
+        # [변경점] 자기 자신에게 보내는지 uuid로 확인합니다.
+        if sender.uuid == recipient.uuid:
             raise HTTPException(status_code=400, detail="자기 자신에게 메시지를 보낼 수 없습니다.")
 
         message_data = {
             "sender_uuid": sender.uuid,
-            "recipient_id": recipient.id,
+            # [변경점] recipient.id 대신 recipient.uuid를 저장합니다.
+            "recipient_uuid": recipient.uuid,
             "danger_obj_id": payload.danger_obj_id
         }
         

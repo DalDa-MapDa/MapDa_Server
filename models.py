@@ -203,8 +203,11 @@ class Message(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     sender_uuid = Column(String(21), ForeignKey('users.uuid'), nullable=False)
-    recipient_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    danger_obj_id = Column(Integer, nullable=False)
+    
+    # [변경점] recipient_id를 recipient_uuid로 변경하고, String(21) 타입으로 수정
+    recipient_uuid = Column(String(21), ForeignKey('users.uuid'), nullable=False)
+    
+    danger_obj_id = Column(Integer, nullable=True) # 이전 요청에 따라 nullable=True로 유지합니다.
 
     # 1~6번 메시지 타입을 boolean으로 저장
     message_type_1 = Column(Boolean, default=False, nullable=False)
@@ -219,8 +222,9 @@ class Message(Base):
     
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
-    # User와의 관계 설정 (보낸 사람, 받는 사람)
+    # [변경점] User와의 관계 설정에서 foreign_keys를 명확히 지정
     sender = relationship('User', foreign_keys=[sender_uuid])
-    recipient = relationship('User', foreign_keys=[recipient_id])
+    recipient = relationship('User', foreign_keys=[recipient_uuid])
+
 # Create all tables in the database
 Base.metadata.create_all(bind=engine)
