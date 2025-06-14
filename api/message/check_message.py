@@ -9,11 +9,11 @@ from datetime import datetime
 router = APIRouter()
 
 # --- Pydantic 응답 모델 정의 ---
-# API가 반환할 메시지의 상세 구조를 정의합니다.
 class MessageDetailsResponse(BaseModel):
     id: int
     sender_uuid: str
-    recipient_id: int
+    # [변경 1] recipient_id를 recipient_uuid로 변경하고 타입을 str로 수정
+    recipient_uuid: str 
     danger_obj_id: Optional[int]
     message_type_1: bool
     message_type_2: bool
@@ -26,7 +26,7 @@ class MessageDetailsResponse(BaseModel):
     created_at: datetime
 
     class Config:
-        from_attributes = True # SQLAlchemy 모델을 Pydantic 모델로 변환 허용
+        from_attributes = True # Pydantic V2 스타일, orm_mode = True와 동일
 
 # API의 최종 응답 구조를 정의합니다.
 class CheckMessageResponse(BaseModel):
@@ -49,7 +49,6 @@ def get_db():
     tags=["Message"],
     summary="읽지 않은 새 메시지 확인"
 )
-
 async def check_for_new_message(
     request: Request,
     db: Session = Depends(get_db)
@@ -60,18 +59,17 @@ async def check_for_new_message(
     - 읽지 않은 메시지가 없으면, `has_new_message: false`를 반환합니다.
     """
     try:
-        # 1. 토큰에서 현재 사용자의 UUID 확인 (미들웨어 통해 주입됨)
+        # 1. 토큰에서 현재 사용자의 UUID 확인
         user_uuid = request.state.user_uuid
         
-        # 2. UUID를 사용하여 사용자의 고유 ID (int) 조회
+        # 2. UUID를 사용하여 사용자 객체 조회 (current_user.uuid 를 사용하기 위함)
         current_user = db.query(User).filter(User.uuid == user_uuid).first()
         if not current_user:
-            # 이 경우는 미들웨어에서 이미 처리되었겠지만, 안전을 위해 추가
             raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
 
-        # 3. 현재 사용자를 수신자로 하고, is_read가 False인 메시지 중 가장 최신 1건 조회
+        # [변경 2] 쿼리 조건을 Message.recipient_uuid 와 current_user.uuid 로 비교하도록 수정
         latest_unread_message = db.query(Message)\
-            .filter(Message.recipient_id == current_user.id)\
+            .filter(Message.recipient_uuid == current_user.uuid)\
             .filter(Message.is_read == False)\
             .order_by(desc(Message.created_at))\
             .first()
