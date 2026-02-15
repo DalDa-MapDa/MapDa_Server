@@ -1,6 +1,7 @@
 from sqlalchemy import Time, create_engine, Column, Integer, String, Float, DateTime, Date, Enum, ForeignKey, func, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.engine import URL
 from dotenv import load_dotenv
 import os
 from datetime import datetime
@@ -9,10 +10,36 @@ from data.university_info import UNIVERSITY_INFO
 load_dotenv()
 
 # Database connection setup
-DATABASE_URL = f"mysql+pymysql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@" \
-               f"{os.getenv('DB_ENDPOINT')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
+db_user = os.getenv('DB_USER', 'root')
+db_password = os.getenv('DB_PASSWORD', '')
+db_name = os.getenv('DB_NAME', 'mapda')
+db_host = os.getenv('DB_HOST') or os.getenv('DB_ENDPOINT') or '127.0.0.1'
+db_unix_socket = os.getenv('DB_UNIX_SOCKET')
 
-engine = create_engine(DATABASE_URL)
+try:
+    db_port = int(os.getenv('DB_PORT', '3306'))
+except ValueError:
+    db_port = 3306
+
+if db_unix_socket:
+    DATABASE_URL = URL.create(
+        'mysql+pymysql',
+        username=db_user,
+        password=db_password or None,
+        database=db_name,
+        query={'unix_socket': db_unix_socket}
+    )
+else:
+    DATABASE_URL = URL.create(
+        'mysql+pymysql',
+        username=db_user,
+        password=db_password or None,
+        host=db_host,
+        port=db_port,
+        database=db_name
+    )
+
+engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 

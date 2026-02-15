@@ -21,18 +21,33 @@ load_dotenv()
 APPLE_CLIENT_ID = os.getenv("APPLE_CLIENT_ID")
 APPLE_KEY_ID = os.getenv("APPLE_KEY_ID")
 APPLE_TEAM_ID = os.getenv("APPLE_TEAM_ID")
+APPLE_AUTH_KEY_PATH = os.getenv("APPLE_AUTH_KEY_PATH")
 
-# AuthKey 파일에서 비밀키를 읽어오기(이 부분은 로컬/서버 환경에 따라 경로가 다를 수 있음)
-# 삭제 금지
-auth_key_path = "/app/secrets/AuthKey_76ZFAC89DR.p8"  # 서버 경로
-# auth_key_path = "secrets/AuthKey_76ZFAC89DR.p8"  # 로컬 경로
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 
-try:
-    with open(auth_key_path, "r") as key_file:
-        APPLE_PRIVATE_KEY = key_file.read()
-except FileNotFoundError:
-    raise HTTPException(status_code=500, detail=f"Private key file not found: {auth_key_path}")
+def _resolve_auth_key_path() -> str:
+    candidates = [
+        APPLE_AUTH_KEY_PATH,
+        "/app/secrets/AuthKey_76ZFAC89DR.p8",
+        os.path.join(PROJECT_ROOT, "secrets", "AuthKey_76ZFAC89DR.p8"),
+        os.path.join(PROJECT_ROOT, "app", "secrets", "AuthKey_76ZFAC89DR.p8"),
+    ]
+
+    for candidate in candidates:
+        if candidate and os.path.exists(candidate):
+            return candidate
+
+    return candidates[0] or candidates[1]
+
+
+def _load_apple_private_key() -> str:
+    auth_key_path = _resolve_auth_key_path()
+    try:
+        with open(auth_key_path, "r") as key_file:
+            return key_file.read()
+    except FileNotFoundError:
+        raise HTTPException(status_code=500, detail=f"Private key file not found: {auth_key_path}")
 
 
 class AppleLoginData(BaseModel):
@@ -123,6 +138,7 @@ def apple_login(data: AppleLoginData, response: Response):
 
 
 def create_client_secret():
+    apple_private_key = _load_apple_private_key()
     headers = {
         "kid": APPLE_KEY_ID,
         "alg": "ES256"
@@ -135,7 +151,7 @@ def create_client_secret():
         "sub": APPLE_CLIENT_ID,
     }
     try:
-        return jwt.encode(payload, APPLE_PRIVATE_KEY, algorithm="ES256", headers=headers)
+        return jwt.encode(payload, apple_private_key, algorithm="ES256", headers=headers)
     except Exception:
         raise HTTPException(status_code=500, detail="Error generating client secret")
 
