@@ -1,24 +1,16 @@
-import json, os, random, uuid, boto3, requests, xml.etree.ElementTree as ET
+import json, os, random, requests, xml.etree.ElementTree as ET
 from dotenv import load_dotenv
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from openai import OpenAI
 from sqlalchemy.orm import Session
 from models import SessionLocal, UserTimetable
 from datetime import time
+from setting.storage import read_upload_as_data_url, upload_file_to_storage
 
 
 router = APIRouter()
 
 load_dotenv()
-
-# S3 클라이언트 설정(유저 시간표 이미지를 저장할 버킷)
-s3_client = boto3.client(
-    's3',
-    aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
-    aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
-    region_name=os.getenv('AWS_REGION')
-)
-S3_BUCKET = os.getenv('S3_USER_TIMETABLE_BUCKET_NAME')
 
 # OpenAI API 키 설정
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
@@ -149,19 +141,8 @@ async def register_timetable_by_image(
         if not user_uuid:
             raise HTTPException(status_code=401, detail="Invalid user.")
 
-        # 이미지 파일을 S3에 업로드
-        file_extension = timeTable_image.filename.split('.')[-1]
-        s3_filename = f"{uuid.uuid4()}.{file_extension}"
-        timeTable_image.file.seek(0)
-        s3_client.upload_fileobj(
-            timeTable_image.file,
-            S3_BUCKET,
-            s3_filename,
-            ExtraArgs={
-                'ContentType': f'image/{file_extension}'
-            }
-        )
-        image_url = f"https://{S3_BUCKET}.s3.{os.getenv('AWS_REGION')}.amazonaws.com/{s3_filename}"
+        stored_image = upload_file_to_storage(timeTable_image, "timetables")
+        image_data_url = read_upload_as_data_url(timeTable_image, stored_image.content_type)
 
         # OpenAI API를 통해 이미지에서 시간표 정보 추출
         client = OpenAI(
@@ -177,7 +158,7 @@ async def register_timetable_by_image(
                     "role": "user",
                     "content": [
                         {"type": "text", "text": gpt_prompt},
-                        {"type": "image_url", "image_url": {"url": image_url}},
+                        {"type": "image_url", "image_url": {"url": image_data_url}},
                     ],
                 }
             ],

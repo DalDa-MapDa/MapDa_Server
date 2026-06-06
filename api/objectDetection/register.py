@@ -1,22 +1,7 @@
-import os
-import uuid
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Request
 from sqlalchemy.orm import Session
 from models import SessionLocal, UserObject, User  # User 모델 임포트
-from dotenv import load_dotenv
-from datetime import datetime
-import boto3
-
-load_dotenv()
-
-# S3 클라이언트 설정
-s3_client = boto3.client(
-    's3',
-    aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
-    aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
-    region_name=os.getenv('AWS_REGION')
-)
-S3_BUCKET = os.getenv('S3_BUCKET_NAME')
+from setting.storage import upload_file_to_storage
 
 router = APIRouter()
 
@@ -46,19 +31,7 @@ async def register_object(
         user_id = user.id
         user_university = user.university  # university 데이터 가져오기
 
-        # S3에 이미지 업로드
-        file_extension = imageData.filename.split('.')[-1]
-        s3_filename = f"{uuid.uuid4()}.{file_extension}"
-        imageData.file.seek(0)  # 파일 포인터를 시작 위치로 재설정
-        s3_client.upload_fileobj(
-            imageData.file,
-            S3_BUCKET,
-            s3_filename,
-            ExtraArgs={
-                'ContentType': f'image/{file_extension}',  # 적절한 MIME 타입 설정
-            }
-        )
-        image_url = f"https://{S3_BUCKET}.s3.{os.getenv('AWS_REGION')}.amazonaws.com/{s3_filename}"
+        stored_image = upload_file_to_storage(imageData, "objects")
 
         # UserObject 객체 생성
         db_object = UserObject(
@@ -68,7 +41,7 @@ async def register_object(
             longitude=longitude,
             object_name=objectName,
             place_name=placeName,
-            image_url=image_url,
+            image_url=stored_image.url,
             university=user_university  # university 데이터 저장
         )
         db.add(db_object)

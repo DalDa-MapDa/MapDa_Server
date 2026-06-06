@@ -1,23 +1,9 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Request
 from sqlalchemy.orm import Session
 from models import SessionLocal, PlaceMaster, PlaceContribution, PlaceContributionImage, User
+from setting.storage import upload_file_to_storage
 
-import uuid
-import os
-import boto3
-from datetime import datetime
 from typing import List
-from dotenv import load_dotenv
-
-load_dotenv()
-
-s3_client = boto3.client(
-    's3',
-    aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
-    aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
-    region_name=os.getenv('AWS_REGION')
-)
-S3_BUCKET = os.getenv('S3_PLACE_BUCKET_NAME')
 
 router = APIRouter()
 
@@ -85,24 +71,15 @@ async def register_moving_data(
         def upload_files(files, image_type):
             urls = []
             for file in files:
-                ext = file.filename.split('.')[-1]
-                s3_filename = f"{uuid.uuid4()}.{ext}"
-                file.file.seek(0)
-                s3_client.upload_fileobj(
-                    file.file,
-                    S3_BUCKET,
-                    s3_filename,
-                    ExtraArgs={'ContentType': f'image/{ext}'}
-                )
-                image_url = f"https://{S3_BUCKET}.s3.{os.getenv('AWS_REGION')}.amazonaws.com/{s3_filename}"
+                stored_image = upload_file_to_storage(file, f"places/{image_type}")
                 # DB 저장
                 db_image = PlaceContributionImage(
                     place_contribution_id=db_contrib.id,
-                    image_url=image_url,
+                    image_url=stored_image.url,
                     image_type=image_type
                 )
                 db.add(db_image)
-                urls.append(image_url)
+                urls.append(stored_image.url)
             return urls
 
         # (indoor)

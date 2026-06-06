@@ -1,4 +1,4 @@
-from sqlalchemy import Time, create_engine, Column, Integer, String, Float, DateTime, Date, Enum, ForeignKey, func, Boolean
+from sqlalchemy import Time, create_engine, Column, Integer, String, Float, DateTime, Date, Enum, ForeignKey, func, Boolean, Text, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from dotenv import load_dotenv
@@ -72,8 +72,8 @@ class Token(Base):
     status = Column(Enum('Active', 'Block', 'Deleted', name='token_statuses'), default='Active', nullable=False)
     refresh_token = Column(String(255), nullable=False)
     provider_type = Column(Enum('KAKAO', 'APPLE', 'GOOGLE', name='provider_types'), nullable=True)
-    provider_access_token = Column(String(255), nullable=True)
-    provider_refresh_token = Column(String(255), nullable=True)
+    provider_access_token = Column(Text, nullable=True)
+    provider_refresh_token = Column(Text, nullable=True)
 
     # Relationship
     user = relationship('User', back_populates='tokens')
@@ -226,5 +226,39 @@ class Message(Base):
     sender = relationship('User', foreign_keys=[sender_uuid])
     recipient = relationship('User', foreign_keys=[recipient_uuid])
 
-# Create all tables in the database
-Base.metadata.create_all(bind=engine)
+def ensure_token_columns_support_long_values():
+    if engine.dialect.name != "mysql":
+        return
+
+    db_name = os.getenv("DB_NAME")
+    if not db_name:
+        return
+
+    with engine.begin() as connection:
+        existing_columns = connection.execute(
+            text(
+                """
+                SELECT COLUMN_NAME, DATA_TYPE
+                FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = :db_name
+                  AND TABLE_NAME = 'tokens'
+                  AND COLUMN_NAME IN ('provider_access_token', 'provider_refresh_token')
+                """
+            ),
+            {"db_name": db_name},
+        ).fetchall()
+
+        for column_name, data_type in existing_columns:
+            if data_type.lower() not in {"text", "mediumtext", "longtext"}:
+                connection.execute(
+                    text(f"ALTER TABLE tokens MODIFY COLUMN `{column_name}` TEXT NULL")
+                )
+
+
+# Create all tables in the database. If the DB is temporarily unavailable,
+# keep the app process alive so /health can report the dependency failure.
+try:
+    Base.metadata.create_all(bind=engine)
+    ensure_token_columns_support_long_values()
+except Exception as error:
+    print(f"Database initialization skipped: {error}")

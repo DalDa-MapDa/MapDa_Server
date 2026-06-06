@@ -1,34 +1,99 @@
-# docker-compose.yml
-# (주의) Docker Compose V2 이상에서 version은 필수가 아님. 없애도 됩니다.
-
-version: '3.8'  # 경고가 뜨면 제거해도 동작은 합니다.
-
 services:
-  app:
+  mapda-nginx:
+    image: mapda:nginx
+    build:
+      context: ./deploy/nginx
+      dockerfile: Dockerfile
+    container_name: mapda-nginx
+    env_file:
+      - .env
+    environment:
+      ACTIVE_COLOR: blue
+    ports:
+      - "17200:80"
+    volumes:
+      - nginx-active:/etc/nginx/active
+      - minio-data:/data
+    networks:
+      - mapda-net
+    restart: unless-stopped
+
+  mapda-server-blue:
+    image: mapda-server:blue
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
-    # ----------------------------------------
-    # (1) .env 파일 로드: 절대 경로 사용
+      args:
+        BUILDKIT_INLINE_CACHE: "1"
+    container_name: mapda-server-blue
     env_file:
-      - /home/ec2-user/.env
-    # ----------------------------------------
+      - .env
     environment:
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-    depends_on:
-      - redis
-    # ----------------------------------------
-    # (2) volumes에 secrets 폴더 절대 경로 마운트
-    #     + (기존) 현재 폴더(.)를 /app에 마운트
+      DB_ENDPOINT: host.docker.internal
+      DB_PORT: "3306"
+      DB_NAME: mapda
+      REDIS_HOST: mapda-nginx
+      REDIS_PORT: "6379"
+      MINIO_ENDPOINT: http://mapda-nginx:9000
+      MINIO_BUCKET: mapda-bucket
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:17200}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
-      - .:/app
-      - /home/ec2-user/secrets:/app/secrets
-    # ----------------------------------------
+      - ./secrets:/app/secrets:ro
+    networks:
+      - mapda-net
+    depends_on:
+      mapda-nginx:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
 
-  redis:
-    image: redis:6.2
-    ports:
-      - "6379:6379"
+  mapda-server-green:
+    image: mapda-server:green
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILDKIT_INLINE_CACHE: "1"
+    container_name: mapda-server-green
+    env_file:
+      - .env
+    environment:
+      DB_ENDPOINT: host.docker.internal
+      DB_PORT: "3306"
+      DB_NAME: mapda
+      REDIS_HOST: mapda-nginx
+      REDIS_PORT: "6379"
+      MINIO_ENDPOINT: http://mapda-nginx:9000
+      MINIO_BUCKET: mapda-bucket
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:17200}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./secrets:/app/secrets:ro
+    networks:
+      - mapda-net
+    depends_on:
+      mapda-nginx:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+networks:
+  mapda-net:
+    name: mapda-net
+
+volumes:
+  nginx-active:
+  minio-data:

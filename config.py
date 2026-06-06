@@ -5,6 +5,7 @@ PUBLIC_PATHS = [
     "/login/apple",
     "/promotion",
     "/promotion/status/app_open",
+    "/health",
     # 기타 인증이 필요 없는 경로 추가
 ]
 
